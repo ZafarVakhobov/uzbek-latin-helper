@@ -193,7 +193,7 @@
 
     <div class="container">
         <div class="header">
-            <div class="title">Uzbek Latin Helper</div>
+            <div class="title">Uzbek Latin Helper v.1.0.0</div>
             <div class="author">&copy; Zafar Vakhobov Softwares, <span id="currentYear"></span></div>
             <div class="status">Özbek lotin alifbosidagi yangi standartlarga moslaşiş hamda matnlar bilan işlaş jarayonini maksimal darajada tezlaştirişga möljallangan Uzbek Latin Helper - Telegram'dagi ilovasi</div>
         </div>
@@ -203,7 +203,7 @@
                 <div class="section-title">Matnni kiriting (Lotin / Kirill):</div>
                 <div class="copy-link" id="copyBtn" onclick="copyEditorText()">Nusxa oliş</div>
             </div>
-            <textarea id="editor" placeholder="Şahar, Özbekiston, Шаҳар, Ўзбекистон..."></textarea>
+            <textarea id="editor" placeholder="Şahar, Özbekiston, Қўqon, Шаҳар..."></textarea>
         </div>
 
         <!-- Блок конвертера: виден на сайте, но автоматически скрывается в Telegram App -->
@@ -224,7 +224,7 @@
         </div>
 
         <div class="footer">
-            <div class="footer-left">&reg; All rights reserved</div>
+            <div class="footer-left">Free Software. All rights reserved</div>
             <a href="https://t.me/ulh_releases" target="_blank" class="pill-btn" onclick="openTgLink(event)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M21.928 2.502a1.15 1.15 0 0 0-1.178-.127L2.126 10.33a1.132 1.132 0 0 0 .08 2.115l4.762 1.563 1.842 5.79a1.13 1.13 0 0 0 1.923.419l2.725-2.853 4.864 3.59a1.136 1.136 0 0 0 1.787-.678l2.24-16.634a1.148 1.148 0 0 0-.421-1.14zm-3.663 3.633-8.798 7.822-.99 3.495-1.352-4.252 11.14-7.065z" fill="#FFFFFF"/>
@@ -283,12 +283,12 @@
         function isRussianCommonWord(word) {
             const lower = word.toLowerCase();
             if (word[0] >= 'А' && word[0] <= 'Я') {
-                return false; // Имена собственные и гео-названия транслитерируем
+                return false; 
             }
             return russianCommonWords.has(lower);
         }
 
-        // Полная кириллическая транслитерация по вашим точным правилам
+        // Полная кириллическая транслитерация
         function cyrillicToLatin(text) {
             if (!text) return "";
 
@@ -300,15 +300,14 @@
                 let res = "";
                 for (let i = 0; i < word.length; i++) {
                     let ch = word[i];
-                    let next = word[i + 1] || "";
-                    let prev = word[i - 1] || "";
-
+                    
                     if (ch === 'Ю' || ch === 'ю') { res += (ch === 'Ю' ? 'Yu' : 'yu'); continue; }
                     if (ch === 'Я' || ch === 'я') { res += (ch === 'Я' ? 'Ya' : 'ya'); continue; }
                     if (ch === 'Ё' || ch === 'ё') { res += (ch === 'Ё' ? 'Yo' : 'yo'); continue; }
+                    
+                    // Правило для Е/е: Ye в начале слова, e в остальных позициях (после согласных и т.д.)
                     if (ch === 'Е' || ch === 'е') { 
-                        // Е/е -> Ye в начале слова, e в остальных позициях
-                        let isStart = (i === 0 || /^[А-Яа-яЁёҒғҚқЎўҲҳЪъ 	\n\r.,!?;:()«»""'']$/.test(prev));
+                        let isStart = (i === 0);
                         res += isStart ? (ch === 'Е' ? 'Ye' : 'ye') : (ch === 'Е' ? 'E' : 'e'); 
                         continue; 
                     }
