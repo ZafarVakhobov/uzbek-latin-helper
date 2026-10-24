@@ -8,7 +8,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Подключаем шрифт Manrope -->
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Библиотека для работы с DOCX, XLSX, PPTX прямо в браузере -->
+    <!-- Библиотека JSZip (оставляем для работы конвертера в обычном браузере) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         * {
@@ -90,7 +90,7 @@
         }
         textarea {
             width: 100%;
-            height: 120px;
+            height: 150px;
             padding: 12px;
             border: 1px solid #CBD5E1;
             border-radius: 12px;
@@ -104,6 +104,7 @@
         textarea:focus {
             border-color: #2AABEE;
         }
+        /* Блок конвертера скрывается только внутри Telegram App */
         .converter-box {
             background: #F8FAFC;
             border: 1px dashed #CBD5E1;
@@ -147,10 +148,6 @@
         }
         .pill-btn:hover {
             opacity: 0.75;
-        }
-        .pill-btn:disabled {
-            opacity: 0.5;
-            cursor: wait;
         }
         .footer {
             display: flex;
@@ -209,18 +206,19 @@
             <textarea id="editor" placeholder="Şahar, Özbekiston, Çoyxona, Ğalaba..."></textarea>
         </div>
 
-        <div class="converter-box">
+        <!-- Блок конвертера (автоматически скрывается в Telegram App, виден в обычном браузере) -->
+        <div class="converter-box" id="converterBox">
             <div class="section-title" style="margin:0;">Office formatidagi fayllar konverteri</div>
             <div class="file-info" id="fileInfo">Yuklab bölaydigan fayllar formati: .docx, .xlsx, .pptx, .txt</div>
             <input type="file" id="fileInput" style="display: none;" accept=".docx,.xlsx,.pptx,.txt" onchange="processFile(event)">
             <div class="btn-row">
-                <button class="pill-btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()">
+                <button class="pill-btn" onclick="document.getElementById('fileInput').click()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     Faylni yuklaş
                 </button>
-                <button id="saveBtn" class="pill-btn" style="display:none;" onclick="downloadFile()">
+                <button id="saveBtn" class="pill-btn" style="display:none; background-color: #10B981;" onclick="downloadFile()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    <span id="saveBtnText">Saqlaş</span>
+                    Saqlaş
                 </button>
             </div>
         </div>
@@ -241,6 +239,12 @@
         if (tg) {
             tg.ready();
             tg.expand();
+
+            // Если открыто внутри Telegram — скрываем конвертер файлов, так как WebView не дает скачивать локальные файлы
+            const isTelegramEnv = Boolean(tg.initData !== undefined && tg.platform && tg.platform !== 'unknown');
+            if (isTelegramEnv) {
+                document.getElementById('converterBox').style.display = 'none';
+            }
         }
 
         function openTgLink(e) {
@@ -437,6 +441,7 @@
             hideTooltip();
         }
 
+        // Логика конвертера файлов (работает на сайте в браузере)
         let processedBlob = null;
         let processedOutName = "";
         let processedMimeType = "application/octet-stream";
@@ -471,11 +476,9 @@
                     const tasks = [];
 
                     zip.forEach((relativePath, zipEntry) => {
-                        // Точно обрабатываем все XML файлы документов, исключая бинарные картинки, шрифты и темы
                         if (relativePath.endsWith('.xml') && !relativePath.startsWith('word/embeddings/') && !relativePath.startsWith('ppt/embeddings/')) {
                             tasks.push(
                                 zipEntry.async("string").then(xmlContent => {
-                                    // Безопасная точечная замена текста внутри тегов XML
                                     const updatedXml = xmlContent.replace(/>([^<]+)</g, function(match, textContent) {
                                         return '>' + applyReplacements(textContent) + '<';
                                     });
@@ -514,36 +517,16 @@
             e.target.value = "";
         }
 
-        // Прямое скачивание через нативное системное меню Web Share API или Data URL без потери байтов
-        async function downloadFile() {
+        function downloadFile() {
             if (!processedBlob) return;
-
-            const fileObj = new File([processedBlob], processedOutName, { type: processedMimeType });
-
-            // Если устройство поддерживает шторку «Поделиться» (мобильные телефоны в Telegram и браузеры)
-            if (navigator.canShare && navigator.canShare({ files: [fileObj] })) {
-                try {
-                    await navigator.share({
-                        files: [fileObj],
-                        title: processedOutName
-                    });
-                    return;
-                } catch (err) {
-                    if (err.name === 'AbortError') return;
-                }
-            }
-
-            // Для компьютеров и систем без Web Share используем прямой Data URL (гарантированно сохраняет полный вес и содержимое)
-            const reader = new FileReader();
-            reader.onloadend = function() {
-                const link = document.createElement('a');
-                link.href = reader.result;
-                link.download = processedOutName;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            };
-            reader.readAsDataURL(processedBlob);
+            const url = URL.createObjectURL(processedBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = processedOutName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
         }
     </script>
 </body>
