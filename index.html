@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uzbek Latin Helper</title>
+    <!-- Подключаем шрифт Manrope -->
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Библиотека для работы с DOCX, XLSX, PPTX прямо в браузере -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Manrope', sans-serif;
+            user-select: none;
+        }
+        body {
+            margin: 0;
+            padding: 16px;
+            background-color: #F8FAFC;
+            color: #0F172A;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 480px;
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .header {
+            text-align: center;
+        }
+        .title {
+            font-size: 22px;
+            font-weight: 800;
+            color: #0F172A;
+            margin: 0 0 4px 0;
+        }
+        .author {
+            font-size: 13px;
+            font-weight: 500;
+            color: #64748B;
+            margin: 0 0 10px 0;
+        }
+        .status {
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.45;
+            color: #10B981;
+            background: #ECFDF5;
+            padding: 8px 14px;
+            border-radius: 12px;
+            display: inline-block;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #334155;
+            margin-bottom: 6px;
+        }
+        .editor-wrapper {
+            position: relative;
+            width: 100%;
+        }
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 12px;
+            border: 1px solid #CBD5E1;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+            transition: border-color 0.2s;
+            user-select: text;
+        }
+        textarea:focus {
+            border-color: #2AABEE;
+        }
+        .converter-box {
+            background: #F8FAFC;
+            border: 1px dashed #CBD5E1;
+            border-radius: 14px;
+            padding: 16px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+        .file-info {
+            font-size: 12px;
+            color: #64748B;
+            word-break: break-word;
+        }
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        /* Фирменная кнопка Telegram / Faylni yuklaş / Saqlaş */
+        .pill-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            height: 36px;
+            padding: 0 18px;
+            background-color: #2AABEE;
+            color: #FFFFFF;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 18px;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: opacity 0.15s ease;
+            box-shadow: 0 4px 12px rgba(42, 171, 238, 0.28);
+        }
+        .pill-btn:hover {
+            opacity: 0.75;
+        }
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 4px;
+            padding-top: 12px;
+            border-top: 1px solid #E2E8F0;
+            gap: 8px;
+        }
+        .footer-left {
+            font-size: 11px;
+            font-weight: 500;
+            color: #94A3B8;
+        }
+        /* Стеклянный тултип Sh / Ch (Liquid Glass) */
+        #popup-tip {
+            position: fixed;
+            display: none;
+            font-family: 'Manrope', sans-serif;
+            font-weight: 700;
+            font-size: 15px;
+            color: #F8FAFC;
+            background: rgba(28, 35, 51, 0.92);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            border-top: 2px solid #88C0D0;
+            padding: 5px 15px;
+            border-radius: 9px;
+            cursor: pointer;
+            z-index: 9999;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+            transition: opacity 0.15s ease;
+        }
+        #popup-tip:hover {
+            opacity: 0.75;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Всплывающий тултип возврата Sh / Ch -->
+    <div id="popup-tip" onmousedown="event.preventDefault(); revertText();">Sh</div>
+
+    <div class="container">
+        <div class="header">
+            <div class="title">Uzbek Latin Helper</div>
+            <div class="author">&copy; Zafar Vakhobov Softwares, <span id="currentYear"></span></div>
+            <div class="status">Özbek lotin alifbosidagi yangi standartlarga moslaşiş hamda matnlar bilan işlaş jarayonini maksimal darajada tezlaştirişga möljallangan Uzbek Latin Helper - Telegram'dagi ilovasi</div>
+        </div>
+
+        <div class="editor-wrapper">
+            <div class="section-title">Matnni kiriting:</div>
+            <textarea id="editor" placeholder="Şahar, Özbekiston, Çoyxona, Ğalaba..."></textarea>
+        </div>
+
+        <div class="converter-box">
+            <div class="section-title" style="margin:0;">Office formatidagi fayllar konverteri</div>
+            <div class="file-info" id="fileInfo">Yuklab bölaydigan fayllar formati: .docx, .xlsx, .pptx, .txt</div>
+            <input type="file" id="fileInput" style="display: none;" accept=".docx,.xlsx,.pptx,.txt" onchange="processFile(event)">
+            <div class="btn-row">
+                <button class="pill-btn" onclick="document.getElementById('fileInput').click()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Faylni yuklaş
+                </button>
+                <button id="saveBtn" class="pill-btn" style="display:none;" onclick="downloadFile()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Saqlaş
+                </button>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="footer-left">Free Software. All rights reserved</div>
+            <a href="https://t.me/lanigiromusic" target="_blank" class="pill-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21.928 2.502a1.15 1.15 0 0 0-1.178-.127L2.126 10.33a1.132 1.132 0 0 0 .08 2.115l4.762 1.563 1.842 5.79a1.13 1.13 0 0 0 1.923.419l2.725-2.853 4.864 3.59a1.136 1.136 0 0 0 1.787-.678l2.24-16.634a1.148 1.148 0 0 0-.421-1.14zm-3.663 3.633-8.798 7.822-.99 3.495-1.352-4.252 11.14-7.065z" fill="#FFFFFF"/>
+                </svg>
+                @lanigiromusic
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // 1. Автоматический текущий год (2026, 2027, 2028 и т.д.)
+        document.getElementById('currentYear').innerText = new Date().getFullYear();
+
+        const editor = document.getElementById('editor');
+        const tip = document.getElementById('popup-tip');
+
+        let replaceTargetIndex = -1;
+        let originalPairValue = "";
+        let tipTimeout = null;
+
+        // Замена только Oʻ и Gʻ (используется внутри кавычек, где Ch и Sh менять нельзя)
+        function replaceOnlyOg(str) {
+            return str
+                .replace(/G['`\u02BB\u2018\u2019\u02BC]/g, 'Ğ')
+                .replace(/g['`\u02BB\u2018\u2019\u02BC]/g, 'ğ')
+                .replace(/O['`\u02BB\u2018\u2019\u02BC]/g, 'Ö')
+                .replace(/o['`\u02BB\u2018\u2019\u02BC]/g, 'ö');
+        }
+
+        // Умная функция замены: защищает ссылки и текст в кавычках от замены Ch / Sh
+        function applyReplacements(text) {
+            if (!text) return "";
+
+            const placeholders = [];
+            function savePlaceholder(content) {
+                const token = "\uE000" + placeholders.length + "\uE001";
+                placeholders.push(content);
+                return token;
+            }
+
+            // Шаг 1. Защищаем URL-ссылки, домены и email-адреса целиком
+            const urlRegex = /(?:https?:\/\/|ftp:\/\/|www\.|t\.me\/)[^\s"'«»“”<>()]+|\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b|\b[a-zA-Z0-9-]+\.(?:uz|com|ru|org|net|io|me|edu|gov|info|biz|tv|co|uk|de|ai|app|dev)(?:\/[^\s"'«»“”<>()]*)?\b/gi;
+            let processed = text.replace(urlRegex, function(match) {
+                return savePlaceholder(match);
+            });
+
+            // Шаг 2. Защищаем зарубежные названия в кавычках ("...", «...», “...”, „...“) от замены Ch / Sh
+            const quoteRegex = /("[^"\n]*"|«[^»\n]*»|“[^”\n]*”|„[^“\n]*“)/g;
+            processed = processed.replace(quoteRegex, function(match) {
+                return savePlaceholder(replaceOnlyOg(match));
+            });
+
+            // Шаг 3. В основном тексте заменяем Oʻ, Gʻ, Sh, Ch
+            processed = replaceOnlyOg(processed)
+                .replace(/S[hH]/g, 'Ş')
+                .replace(/s[hH]/g, 'ş')
+                .replace(/C[hH]/g, 'Ç')
+                .replace(/c[hH]/g, 'ç');
+
+            // Шаг 4. Возвращаем защищенные ссылки и кавычки на место
+            processed = processed.replace(/\uE000(\d+)\uE001/g, function(_, index) {
+                return placeholders[Number(index)];
+            });
+
+            return processed;
+        }
+
+        // Проверка при наборе в реальном времени: находится ли курсор внутри ссылки или внутри кавычек
+        function isCursorInUrlOrQuotes(textBeforeCursor) {
+            // 1. Проверяем текущее набираемое слово на ссылку / домен
+            const words = textBeforeCursor.split(/\s+/);
+            const currentWord = words[words.length - 1] || "";
+            if (/^(https?:\/\/|ftp:\/\/|www\.|t\.me\/)/i.test(currentWord) ||
+                /[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/i.test(currentWord) ||
+                currentWord.includes("://") ||
+                currentWord.includes("www.")) {
+                return true;
+            }
+
+            // 2. Проверяем, не открыта ли перед курсором кавычка ("...", «...», “...”)
+            const lastLine = textBeforeCursor.split('\n').pop();
+            const straightQuotes = (lastLine.match(/"/g) || []).length;
+            if (straightQuotes % 2 === 1) return true;
+
+            const openGuillemets = (lastLine.match(/«/g) || []).length;
+            const closeGuillemets = (lastLine.match(/»/g) || []).length;
+            if (openGuillemets > closeGuillemets) return true;
+
+            const openCurly = (lastLine.match(/[“„]/g) || []).length;
+            const closeCurly = (lastLine.match(/”/g) || []).length;
+            if (openCurly > closeCurly) return true;
+
+            return false;
+        }
+
+        // 2. Мгновенная автозамена при вставке скопированного текста (Ctrl+V / Paste)
+        editor.addEventListener('paste', function(e) {
+            e.preventDefault();
+            let pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            let convertedPaste = applyReplacements(pastedText);
+
+            let start = this.selectionStart;
+            let end = this.selectionEnd;
+            let val = this.value;
+
+            this.value = val.substring(0, start) + convertedPaste + val.substring(end);
+            this.selectionStart = this.selectionEnd = start + convertedPaste.length;
+            hideTooltip();
+        });
+
+        // 3. Автозамена при наборе текста + защита ссылок/кавычек + всплывающий тултип для Sh / Ch
+        editor.addEventListener('input', function(e) {
+            if (e.inputType === 'insertFromPaste') {
+                let pos = this.selectionStart;
+                let before = applyReplacements(this.value.substring(0, pos));
+                let after = applyReplacements(this.value.substring(pos));
+                this.value = before + after;
+                this.selectionStart = this.selectionEnd = before.length;
+                return;
+            }
+
+            let val = this.value;
+            let pos = this.selectionStart;
+
+            if (pos < 2) return;
+            let twoChars = val.substring(pos - 2, pos);
+            let c1 = twoChars.charAt(0);
+            let c2 = twoChars.charAt(1);
+
+            let rep = "";
+            let isShCh = false;
+            let isApos = (c2 === "'" || c2 === "`" || c2 === "\u02BB" || c2 === "\u2018" || c2 === "\u2019" || c2 === "\u02BC");
+
+            let textBefore = val.substring(0, pos);
+            let inProtectedContext = isCursorInUrlOrQuotes(textBefore);
+
+            if ((c1 === 's' || c1 === 'S') && (c2 === 'h' || c2 === 'H')) {
+                if (inProtectedContext) return; // Не меняем Sh в ссылках и кавычках
+                rep = (c1 === 'S') ? 'Ş' : 'ş';
+                isShCh = true;
+            } else if ((c1 === 'c' || c1 === 'C') && (c2 === 'h' || c2 === 'H')) {
+                if (inProtectedContext) return; // Не меняем Ch в ссылках и кавычках
+                rep = (c1 === 'C') ? 'Ç' : 'ç';
+                isShCh = true;
+            } else if ((c1 === 'g' || c1 === 'G') && isApos) {
+                rep = (c1 === 'G') ? 'Ğ' : 'ğ';
+            } else if ((c1 === 'o' || c1 === 'O') && isApos) {
+                rep = (c1 === 'O') ? 'Ö' : 'ö';
+            }
+
+            if (rep !== "") {
+                this.value = val.substring(0, pos - 2) + rep + val.substring(pos);
+                let newCursorPos = pos - 1;
+                this.selectionStart = this.selectionEnd = newCursorPos;
+
+                if (isShCh) {
+                    showTooltip(twoChars, newCursorPos - 1);
+                } else {
+                    hideTooltip();
+                }
+            }
+        });
+
+        function showTooltip(origPair, charIdx) {
+            replaceTargetIndex = charIdx;
+            originalPairValue = origPair;
+
+            tip.innerText = origPair;
+            tip.style.display = 'block';
+
+            let rect = editor.getBoundingClientRect();
+            tip.style.left = (rect.left + 20) + 'px';
+            tip.style.top = (rect.top - 12) + 'px';
+
+            if (tipTimeout) clearTimeout(tipTimeout);
+            tipTimeout = setTimeout(hideTooltip, 5000);
+        }
+
+        function hideTooltip() {
+            tip.style.display = 'none';
+            replaceTargetIndex = -1;
+            originalPairValue = "";
+        }
+
+        function revertText() {
+            if (replaceTargetIndex < 0 || !originalPairValue) return;
+            let val = editor.value;
+            let targetChar = val.charAt(replaceTargetIndex);
+
+            if (targetChar === 'ş' || targetChar === 'Ş' || targetChar === 'ç' || targetChar === 'Ç') {
+                let currentCaret = editor.selectionStart;
+                editor.value = val.substring(0, replaceTargetIndex) + originalPairValue + val.substring(replaceTargetIndex + 1);
+                let newCaret = (currentCaret > replaceTargetIndex) ? currentCaret + 1 : replaceTargetIndex + 2;
+                editor.focus();
+                editor.selectionStart = editor.selectionEnd = newCaret;
+            }
+            hideTooltip();
+        }
+
+        // 4. Надёжный конвертер для .docx, .xlsx, .pptx и .txt (сохраняет структуру, ссылки и названия в кавычках)
+        let processedBlob = null;
+        let processedFileName = "";
+
+        function convertXmlTextSafely(xmlString) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlString, "application/xml");
+
+            if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
+                return xmlString.replace(/>([^<]+)</g, function(full, innerText) {
+                    return '>' + applyReplacements(innerText) + '<';
+                });
+            }
+
+            // Обрабатываем текст на уровне абзацев (<w:p>, <a:p>, <si>), чтобы видеть кавычки и ссылки целиком,
+            // даже если Word разбил их на несколько соседних тегов <w:t>
+            const allElements = xmlDoc.getElementsByTagName("*");
+            const containers = [];
+            for (let i = 0; i < allElements.length; i++) {
+                const ln = allElements[i].localName;
+                if (ln === "p" || ln === "si") {
+                    containers.push(allElements[i]);
+                }
+            }
+
+            if (containers.length > 0) {
+                for (let c = 0; c < containers.length; c++) {
+                    const children = containers[c].getElementsByTagName("*");
+                    const tNodes = [];
+                    for (let j = 0; j < children.length; j++) {
+                        if (children[j].localName === "t") {
+                            tNodes.push(children[j]);
+                        }
+                    }
+                    processTextNodeGroup(tNodes);
+                }
+            } else {
+                const tNodes = [];
+                for (let i = 0; i < allElements.length; i++) {
+                    if (allElements[i].localName === "t") {
+                        tNodes.push(allElements[i]);
+                    }
+                }
+                processTextNodeGroup(tNodes);
+            }
+
+            const serializer = new XMLSerializer();
+            return serializer.serializeToString(xmlDoc);
+        }
+
+        // Обработка группы текстовых узлов внутри одного абзаца с сохранением форматирования каждого узла
+        function processTextNodeGroup(tNodes) {
+            if (tNodes.length === 0) return;
+
+            // Склеиваем пограничные пары на стыке двух соседних тегов <w:t> (если это не ссылка и не кавычки)
+            let fullBefore = "";
+            for (let i = 0; i < tNodes.length - 1; i++) {
+                let curr = tNodes[i].textContent || "";
+                let next = tNodes[i + 1].textContent || "";
+                fullBefore += curr;
+
+                if (!curr || !next) continue;
+
+                let lastChar = curr.charAt(curr.length - 1);
+                let firstChar = next.charAt(0);
+                let pair = lastChar + firstChar;
+
+                if (!isCursorInUrlOrQuotes(fullBefore)) {
+                    let replacedPair = applyReplacements(pair);
+                    if (replacedPair.length === 1 && replacedPair !== pair) {
+                        tNodes[i].textContent = curr.substring(0, curr.length - 1) + replacedPair;
+                        tNodes[i + 1].textContent = next.substring(1);
+                    }
+                }
+            }
+
+            // Отслеживаем контекст кавычек/ссылок по ходу абзаца
+            let runningText = "";
+            for (let i = 0; i < tNodes.length; i++) {
+                let raw = tNodes[i].textContent;
+                if (!raw) continue;
+
+                // Если предыдущие узлы открыли кавычку и еще не закрыли её
+                if (isCursorInUrlOrQuotes(runningText)) {
+                    // Проверяем, закрывается ли кавычка внутри текущего узла
+                    let closeIdx = raw.search(/["»”]/);
+                    if (closeIdx !== -1) {
+                        let quotedPart = raw.substring(0, closeIdx + 1);
+                        let restPart = raw.substring(closeIdx + 1);
+                        tNodes[i].textContent = replaceOnlyOg(quotedPart) + applyReplacements(restPart);
+                    } else {
+                        tNodes[i].textContent = replaceOnlyOg(raw);
+                    }
+                } else {
+                    tNodes[i].textContent = applyReplacements(raw);
+                }
+                runningText += raw;
+            }
+        }
+
+        async function processFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const fileInfo = document.getElementById('fileInfo');
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.style.display = 'none';
+            processedBlob = null;
+            processedFileName = file.name;
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            fileInfo.style.color = "#3B82F6";
+            fileInfo.innerText = "Jarayonda: " + file.name + "...";
+
+            try {
+                if (ext === 'txt') {
+                    const text = await file.text();
+                    const converted = applyReplacements(text);
+                    processedBlob = new Blob([converted], { type: "text/plain;charset=utf-8" });
+                } else if (ext === 'docx' || ext === 'xlsx' || ext === 'pptx') {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const zip = await JSZip.loadAsync(arrayBuffer);
+                    const tasks = [];
+
+                    zip.forEach((relativePath, zipEntry) => {
+                        const isWordXml = /^word\/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$/i.test(relativePath);
+                        const isExcelXml = /^xl\/(sharedStrings\.xml|worksheets\/sheet\d+\.xml)$/i.test(relativePath);
+                        const isPptXml = /^ppt\/(slides\/slide\d+|notesSlides\/notesSlide\d+)\.xml$/i.test(relativePath);
+
+                        if (isWordXml || isExcelXml || isPptXml) {
+                            tasks.push(
+                                zipEntry.async("string").then(xmlContent => {
+                                    const updatedXml = convertXmlTextSafely(xmlContent);
+                                    zip.file(relativePath, updatedXml);
+                                })
+                            );
+                        }
+                    });
+
+                    await Promise.all(tasks);
+
+                    let mimeType = "application/octet-stream";
+                    if (ext === 'docx') mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                    if (ext === 'xlsx') mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                    if (ext === 'pptx') mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+                    processedBlob = await zip.generateAsync({
+                        type: "blob",
+                        mimeType: mimeType,
+                        compression: "DEFLATE"
+                    });
+                } else {
+                    fileInfo.style.color = "#E11D48";
+                    fileInfo.innerText = "Faqat .docx, .xlsx, .pptx yoki .txt fayllarni tanlang";
+                    return;
+                }
+
+                fileInfo.style.color = "#10B981";
+                fileInfo.innerText = "Tayyor: " + file.name;
+                saveBtn.style.display = 'inline-flex';
+            } catch (err) {
+                fileInfo.style.color = "#E11D48";
+                fileInfo.innerText = "Xatolik yuz berdi: " + err.message;
+            }
+
+            e.target.value = "";
+        }
+
+        function downloadFile() {
+            if (!processedBlob) return;
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(processedBlob);
+            link.href = url;
+
+            const dotIndex = processedFileName.lastIndexOf('.');
+            const outName = (dotIndex !== -1)
+                ? processedFileName.substring(0, dotIndex) + "_yangi" + processedFileName.substring(dotIndex)
+                : "yangi_" + processedFileName;
+
+            link.download = outName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+        }
+    </script>
+</body>
+</html>
