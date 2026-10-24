@@ -240,7 +240,6 @@
             tg.ready();
             tg.expand();
 
-            // Если открыто внутри Telegram — скрываем конвертер файлов
             const isTelegramEnv = Boolean(tg.initData !== undefined && tg.platform && tg.platform !== 'unknown');
             if (isTelegramEnv) {
                 document.getElementById('converterBox').style.display = 'none';
@@ -300,16 +299,20 @@
                 let res = "";
                 for (let i = 0; i < word.length; i++) {
                     let ch = word[i];
-                    
+                    let prev = word[i - 1] || "";
+
                     if (ch === 'Ю' || ch === 'ю') { res += (ch === 'Ю' ? 'Yu' : 'yu'); continue; }
                     if (ch === 'Я' || ch === 'я') { res += (ch === 'Я' ? 'Ya' : 'ya'); continue; }
                     if (ch === 'Ё' || ch === 'ё') { res += (ch === 'Ё' ? 'Yo' : 'yo'); continue; }
                     
-                    // Правило для Е/е: Ye в начале слова, e в остальных позициях (после согласных и т.д.)
-                    if (ch === 'Е' || ch === 'е') { 
-                        let isStart = (i === 0);
-                        res += isStart ? (ch === 'Е' ? 'Ye' : 'ye') : (ch === 'Е' ? 'E' : 'e'); 
-                        continue; 
+                    // Правило для Е/е: Ye в начале слова ИЛИ после гласных/апострофов/разделителей, во всех остальных позициях — ye/e
+                    if (ch === 'Е' || ch === 'е') {
+                        let isStart = (i === 0 || /^[А-Яа-яЁёҒғҚқЎўҲҳЪъA-Za-z\s.,!?;:()«»""''‘’ʼ_-]$/.test(prev));
+                        let isAfterVowel = /[аеёиоўуэюяа́е́ё́и́о́ў́у́э́ю́я́äëöüăğşç]/.test(prev.toLowerCase());
+                        
+                        let tr = (isStart || isAfterVowel) ? (ch === 'Е' ? 'Ye' : 'ye') : (ch === 'Е' ? 'E' : 'e');
+                        res += tr;
+                        continue;
                     }
 
                     switch (ch) {
