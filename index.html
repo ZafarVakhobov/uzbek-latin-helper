@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Uzbek Latin Helper v.1.0.0</title>
+    <title>Uzbek Latin Helper</title>
     <!-- Официальный SDK Telegram Mini Apps -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Подключаем шрифт Manrope -->
@@ -193,14 +193,14 @@
 
     <div class="container">
         <div class="header">
-            <div class="title">Uzbek Latin Helper v.1.0.0</div>
+            <div class="title">Uzbek Latin Helper</div>
             <div class="author">&copy; Zafar Vakhobov Softwares, <span id="currentYear"></span></div>
             <div class="status">Özbek lotin alifbosidagi yangi standartlarga moslaşiş hamda matnlar bilan işlaş jarayonini maksimal darajada tezlaştirişga möljallangan Uzbek Latin Helper - Telegram'dagi ilovasi</div>
         </div>
 
         <div class="editor-wrapper">
             <div class="section-header">
-                <div class="section-title">Matnni kiriting (Lotin / Kirill):</div>
+                <div class="section-title">Matnni kiriting:</div>
                 <div class="copy-link" id="copyBtn" onclick="copyEditorText()">Nusxa oliş</div>
             </div>
             <textarea id="editor" placeholder="Şahar, Özbekiston, Қўqon, Шаҳар..."></textarea>
@@ -240,7 +240,8 @@
             tg.ready();
             tg.expand();
 
-            const isTelegramEnv = Boolean(tg.initData !== undefined && tg.platform && tg.platform !== 'unknown');
+            // Скрываем блок конвертера файлов только внутри среды Telegram Mini App
+            const isTelegramEnv = Boolean(tg.initData && tg.initData.length > 0);
             if (isTelegramEnv) {
                 document.getElementById('converterBox').style.display = 'none';
             }
@@ -272,94 +273,123 @@
         let originalPairValue = "";
         let tipTimeout = null;
 
+        // Исконно русские слова, которые не транслитерируются (однобуквенные союзы/местоимения вроде "у", "в", "а", "и" исключены, чтобы не ломать узбекское "у")
         const russianCommonWords = new Set([
-            "и", "в", "не", "на", "я", "быть", "он", "с", "что", "а", "по", "о", "кто", "это", "как",
-            "у", "к", "же", "вы", "за", "бы", "то", "ее", "мне", "ты", "вот", "от", "меня", "еще",
-            "нет", "из", "ему", "теперь", "когда", "да", "уже", "для", "до", "ли", "может", "книга",
-            "школа", "машина", "человек", "город", "дом", "работа", "земля", "вода", "солнце", "время"
+            "моя", "мой", "мои", "моё", "книга", "школа", "машина", "человек",
+            "город", "дом", "работа", "земля", "вода", "солнце", "время",
+            "это", "как", "что", "быть", "меня", "тебя", "ему", "теперь", "когда", "только", "уже"
         ]);
 
         function isRussianCommonWord(word) {
-            const lower = word.toLowerCase();
+            // Имена собственные с заглавной буквы всегда транслитерируются
             if (word[0] >= 'А' && word[0] <= 'Я') {
-                return false; 
+                return false;
             }
-            return russianCommonWords.has(lower);
+            return russianCommonWords.has(word.toLowerCase());
         }
 
-        // Полная кириллическая транслитерация
+        // Проверка: является ли кириллическая буква гласной
+        function isCyrillicVowel(ch) {
+            if (!ch) return false;
+            return "аеёиоуўэюяАЕЁИОУЎЭЮЯ".indexOf(ch) !== -1;
+        }
+
+        // Полная кириллическая транслитерация по утвержденным правилам
         function cyrillicToLatin(text) {
             if (!text) return "";
 
-            // Исключения для слов типа субъект, объект
-            let modifiedText = text
-                .replace(/Субъект/g, "Subyekt").replace(/субъект/g, "subyekt")
-                .replace(/Объект/g, "Obyekt").replace(/объект/g, "obyekt");
-
-            return modifiedText.replace(/[А-Яа-яЁёҒғҚқЎўҲҳЪъ]+(?:['`ʼ][А-Яа-яЁёҒғҚқЎўҲҳЪъ]+)*/g, function(word) {
+            return text.replace(/[А-Яа-яЁёҒғҚқЎўҲҳЪъЬь]+/g, function(word) {
                 if (isRussianCommonWord(word)) {
                     return word;
                 }
 
+                // Предварительная обработка сочетаний с мягким знаком (например: октябрь -> октaбр, Эльдорадо -> Элдорадо)
+                let cleanedWord = word
+                    .replace(/([бвгғджзклмнпрстфхҳцчшБВГҒДЖЗКЛМНПРСТФХҲЦЧШ])[Ьь][Яя]/g, "$1a")
+                    .replace(/([бвгғджзклмнпрстфхҳцчшБВГҒДЖЗКЛМНПРСТФХҲЦЧШ])[Ьь][Юю]/g, "$1u")
+                    .replace(/([бвгғджзклмнпрстфхҳцчшБВГҒДЖЗКЛМНПРСТФХҲЦЧШ])[Ьь][Ёё]/g, "$1o")
+                    .replace(/([бвгғджзклмнпрстфхҳцчшБВГҒДЖЗКЛМНПРСТФХҲЦЧШ])[Ьь][Ее]/g, function(m, c1) {
+                        return c1 + "ye"; // например, "карьер" -> "karyer"
+                    });
+
                 let res = "";
-                for (let i = 0; i < word.length; i++) {
-                    let ch = word[i];
-                    let prev = word[i - 1] || "";
-                    let next = word[i + 1] || "";
+                for (let i = 0; i < cleanedWord.length; i++) {
+                    let ch = cleanedWord[i];
+                    let prev = i > 0 ? cleanedWord[i - 1] : "";
+
+                    // Мягкий знак полностью игнорируется (не оставляет ни пробела, ни апострофа)
+                    if (ch === 'Ь' || ch === 'ь') {
+                        continue;
+                    }
+
+                    // Твердый знак Ъ/ъ: перед Е/е в словах типа Субъект/Объект он не ставит апостроф, а превращает Е в ye (Subyekt, Obyekt)
+                    if (ch === 'Ъ' || ch === 'ъ') {
+                        let nextChar = cleanedWord[i + 1] || "";
+                        if (nextChar === 'Е' || nextChar === 'е') {
+                            continue;
+                        }
+                        res += '’';
+                        continue;
+                    }
+
+                    // Правило для Е / е:
+                    // Ye/ye ТОЛЬКО в начале слова (i === 0), после гласной (Мирзиёева -> Mirziyoyeva) или после Ъ/Ь (Субъект -> Subyekt).
+                    // Во всех остальных случаях (после согласных: Президент, Ўзбек, кечмайди) — строго E/e!
+                    if (ch === 'Е' || ch === 'е') {
+                        let useYe = (i === 0) || isCyrillicVowel(prev) || prev === 'Ъ' || prev === 'ъ' || prev === 'Ь' || prev === 'ь';
+                        if (useYe) {
+                            res += (ch === 'Е') ? 'Ye' : 'ye';
+                        } else {
+                            res += (ch === 'Е') ? 'E' : 'e';
+                        }
+                        continue;
+                    }
+
+                    // Сочетание "я" в слове "октябрь" -> "oktabr"
+                    if ((ch === 'Я' || ch === 'я') && /^октябр/i.test(word)) {
+                        res += (ch === 'Я') ? 'A' : 'a';
+                        continue;
+                    }
 
                     if (ch === 'Ю' || ch === 'ю') { res += (ch === 'Ю' ? 'Yu' : 'yu'); continue; }
                     if (ch === 'Я' || ch === 'я') { res += (ch === 'Я' ? 'Ya' : 'ya'); continue; }
                     if (ch === 'Ё' || ch === 'ё') { res += (ch === 'Ё' ? 'Yo' : 'yo'); continue; }
-                    
-                    // Правило для Е/е: 
-                    // Ye в начале слова, после гласных, в именах собственных (с заглавной буквы) или после ъ/ь/ʼ.
-                    // После согласных всегда E/e (Президент -> Prezident).
-                    if (ch === 'Е' || ch === 'е') {
-                        let isStart = (i === 0);
-                        let isAfterVowel = /[аеёиоўуэюяäëöüăğşç]/.test(prev.toLowerCase());
-                        let isAfterConsonant = /[бвгғджзйкқлмнпрстфхҳцчш]/.test(prev.toLowerCase());
-                        let isProperName = (word[0] >= 'А' && word[0] <= 'Я');
-                        let isAfterSep = /['`ʼъь]/.test(prev);
-
-                        let useYe = isStart || isAfterVowel || isAfterSep || (isProperName && !isAfterConsonant);
-                        res += useYe ? (ch === 'Е' ? 'Ye' : 'ye') : (ch === 'Е' ? 'E' : 'e');
-                        continue;
-                    }
 
                     switch (ch) {
-                        case 'А': case 'а': res += (ch === 'А' ? 'A' : 'a'); break;
-                        case 'Б': case 'б': res += (ch === 'Б' ? 'B' : 'b'); break;
-                        case 'В': case 'в': res += (ch === 'В' ? 'V' : 'v'); break;
-                        case 'Г': case 'г': res += (ch === 'Г' ? 'G' : 'g'); break;
-                        case 'Ғ': case 'ғ': res += (ch === 'Ғ' ? 'Ğ' : 'ğ'); break;
-                        case 'Д': case 'д': res += (ch === 'Д' ? 'D' : 'd'); break;
-                        case 'Ж': case 'ж': res += (ch === 'Ж' ? 'J' : 'j'); break;
-                        case 'З': case 'з': res += (ch === 'З' ? 'Z' : 'z'); break;
-                        case 'И': case 'и': res += (ch === 'И' ? 'I' : 'i'); break;
-                        case 'Й': case 'й': res += (ch === 'Й' ? 'Y' : 'y'); break;
-                        case 'К': case 'к': res += (ch === 'К' ? 'K' : 'k'); break;
-                        case 'Қ': case 'қ': res += (ch === 'Қ' ? 'Q' : 'q'); break;
-                        case 'Л': case 'л': res += (ch === 'Л' ? 'L' : 'l'); break;
-                        case 'М': case 'м': res += (ch === 'М' ? 'M' : 'm'); break;
-                        case 'Н': case 'н': res += (ch === 'Н' ? 'N' : 'n'); break;
-                        case 'О': case 'о': res += (ch === 'О' ? 'O' : 'o'); break;
-                        case 'П': case 'п': res += (ch === 'П' ? 'P' : 'p'); break;
-                        case 'Р': case 'р': res += (ch === 'Р' ? 'R' : 'r'); break;
-                        case 'С': case 'с': res += (ch === 'С' ? 'S' : 's'); break;
-                        case 'Т': case 'т': res += (ch === 'Т' ? 'T' : 't'); break;
-                        case 'У': case 'у': res += (ch === 'У' ? 'U' : 'u'); break;
-                        case 'Ў': case 'ў': res += (ch === 'Ў' ? 'Ö' : 'ö'); break;
-                        case 'Ф': case 'ф': res += (ch === 'Ф' ? 'F' : 'f'); break;
-                        case 'Х': case 'х': res += (ch === 'Х' ? 'X' : 'x'); break;
-                        case 'Ҳ': case 'ҳ': res += (ch === 'Ҳ' ? 'H' : 'h'); break;
-                        case 'Ц': case 'ц':
-                            let isWordStart = (i === 0);
-                            res += isWordStart ? (ch === 'Ц' ? 'S' : 's') : (ch === 'Ц' ? 'Ts' : 'ts');
+                        case 'А': res += 'A'; break; case 'а': res += 'a'; break;
+                        case 'Б': res += 'B'; break; case 'б': res += 'b'; break;
+                        case 'В': res += 'V'; break; case 'в': res += 'v'; break;
+                        case 'Г': res += 'G'; break; case 'г': res += 'g'; break;
+                        case 'Ғ': res += 'Ğ'; break; case 'ғ': res += 'ğ'; break;
+                        case 'Д': res += 'D'; break; case 'д': res += 'd'; break;
+                        case 'Ж': res += 'J'; break; case 'ж': res += 'j'; break;
+                        case 'З': res += 'Z'; break; case 'з': res += 'z'; break;
+                        case 'И': res += 'I'; break; case 'и': res += 'i'; break;
+                        case 'Й': res += 'Y'; break; case 'й': res += 'y'; break;
+                        case 'К': res += 'K'; break; case 'к': res += 'k'; break;
+                        case 'Қ': res += 'Q'; break; case 'қ': res += 'q'; break;
+                        case 'Л': res += 'L'; break; case 'л': res += 'l'; break;
+                        case 'М': res += 'M'; break; case 'м': res += 'm'; break;
+                        case 'Н': res += 'N'; break; case 'н': res += 'n'; break;
+                        case 'О': res += 'O'; break; case 'о': res += 'o'; break;
+                        case 'П': res += 'P'; break; case 'п': res += 'p'; break;
+                        case 'Р': res += 'R'; break; case 'р': res += 'r'; break;
+                        case 'С': res += 'S'; break; case 'с': res += 's'; break;
+                        case 'Т': res += 'T'; break; case 'т': res += 't'; break;
+                        case 'У': res += 'U'; break; case 'у': res += 'u'; break;
+                        case 'Ў': res += 'Ö'; break; case 'ў': res += 'ö'; break;
+                        case 'Ф': res += 'F'; break; case 'ф': res += 'f'; break;
+                        case 'Х': res += 'X'; break; case 'х': res += 'x'; break;
+                        case 'Ҳ': res += 'H'; break; case 'ҳ': res += 'h'; break;
+                        case 'Ц':
+                            res += (i === 0) ? 'S' : 'Ts';
                             break;
-                        case 'Ч': case 'ч': res += (ch === 'Ч' ? 'Ç' : 'ç'); break;
-                        case 'Ш': case 'ш': res += (ch === 'Ш' ? 'Ş' : 'ş'); break;
-                        case 'Ъ': case 'ъ': case 'Ь': case 'ь': res += '’'; break;
-                        case 'Э': case 'э': res += (ch === 'Э' ? 'E' : 'e'); break;
+                        case 'ц':
+                            res += (i === 0) ? 's' : 'ts';
+                            break;
+                        case 'Ч': res += 'Ç'; break; case 'ч': res += 'ç'; break;
+                        case 'Ш': res += 'Ş'; break; case 'ш': res += 'ş'; break;
+                        case 'Э': res += 'E'; break; case 'э': res += 'e'; break;
                         default:
                             res += ch;
                     }
@@ -379,8 +409,6 @@
         function applyReplacements(text) {
             if (!text) return "";
 
-            let processed = cyrillicToLatin(text);
-
             const placeholders = [];
             function savePlaceholder(content) {
                 const token = "\uE000" + placeholders.length + "\uE001";
@@ -388,22 +416,33 @@
                 return token;
             }
 
+            // 1. Защищаем ссылки и домены от любых замен
             const urlRegex = /(?:https?:\/\/|ftp:\/\/|www\.|t\.me\/)[^\s"'«»“”<>()]+|\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b|\b[a-zA-Z0-9-]+\.(?:uz|com|ru|org|net|io|me|edu|gov|info|biz|tv|co|uk|de|ai|app|dev)(?:\/[^\s"'«»“”<>()]*)?\b/gi;
-            processed = processed.replace(urlRegex, function(match) {
+            let processed = text.replace(urlRegex, function(match) {
                 return savePlaceholder(match);
             });
 
+            // 2. Защищаем латинские бренды/названия в кавычках от замены Sh / Ch, но кириллицу внутри кавычек переводим
             const quoteRegex = /("[^"\n]*"|«[^»\n]*»|“[^”\n]*”|„[^“\n]*“)/g;
             processed = processed.replace(quoteRegex, function(match) {
+                // Если внутри кавычек есть кириллица — транслитерируем её, иначе защищаем латинские Sh/Ch
+                if (/[А-Яа-яЁёҒғҚқЎўҲҳ]/.test(match)) {
+                    return cyrillicToLatin(replaceOnlyOg(match));
+                }
                 return savePlaceholder(replaceOnlyOg(match));
             });
 
+            // 3. Транслитерируем кириллицу в основном тексте
+            processed = cyrillicToLatin(processed);
+
+            // 4. Заменяем старые латинские сочетания O', G', Sh, Ch на новые
             processed = replaceOnlyOg(processed)
                 .replace(/S[hH]/g, 'Ş')
                 .replace(/s[hH]/g, 'ş')
                 .replace(/C[hH]/g, 'Ç')
                 .replace(/c[hH]/g, 'ç');
 
+            // 5. Возвращаем защищенные ссылки и латинские цитаты
             processed = processed.replace(/\uE000(\d+)\uE001/g, function(_, index) {
                 return placeholders[Number(index)];
             });
@@ -462,169 +501,3 @@
 
             let val = this.value;
             let pos = this.selectionStart;
-
-            if (pos < 2) return;
-            let twoChars = val.substring(pos - 2, pos);
-            let c1 = twoChars.charAt(0);
-            let c2 = twoChars.charAt(1);
-
-            let rep = "";
-            let isShCh = false;
-            let isApos = (c2 === "'" || c2 === "`" || c2 === "\u02BB" || c2 === "\u2018" || c2 === "\u2019" || c2 === "\u02BC");
-
-            let textBefore = val.substring(0, pos);
-            let inProtectedContext = isCursorInUrlOrQuotes(textBefore);
-
-            if ((c1 === 's' || c1 === 'S') && (c2 === 'h' || c2 === 'H')) {
-                if (inProtectedContext) return;
-                rep = (c1 === 'S') ? 'Ş' : 'ş';
-                isShCh = true;
-            } else if ((c1 === 'c' || c1 === 'C') && (c2 === 'h' || c2 === 'H')) {
-                if (inProtectedContext) return;
-                rep = (c1 === 'C') ? 'Ç' : 'ç';
-                isShCh = true;
-            } else if ((c1 === 'g' || c1 === 'G') && isApos) {
-                rep = (c1 === 'G') ? 'Ğ' : 'ğ';
-            } else if ((c1 === 'o' || c1 === 'O') && isApos) {
-                rep = (c1 === 'O') ? 'Ö' : 'ö';
-            }
-
-            if (rep !== "") {
-                this.value = val.substring(0, pos - 2) + rep + val.substring(pos);
-                let newCursorPos = pos - 1;
-                this.selectionStart = this.selectionEnd = newCursorPos;
-
-                if (isShCh) {
-                    showTooltip(twoChars, newCursorPos - 1);
-                } else {
-                    hideTooltip();
-                }
-            }
-        });
-
-        function showTooltip(origPair, charIdx) {
-            replaceTargetIndex = charIdx;
-            originalPairValue = origPair;
-
-            tip.innerText = origPair;
-            tip.style.display = 'block';
-
-            let rect = editor.getBoundingClientRect();
-            tip.style.left = (rect.left + 20) + 'px';
-            tip.style.top = (rect.top - 12) + 'px';
-
-            if (tipTimeout) clearTimeout(tipTimeout);
-            tipTimeout = setTimeout(hideTooltip, 5000);
-        }
-
-        function hideTooltip() {
-            tip.style.display = 'none';
-            replaceTargetIndex = -1;
-            originalPairValue = "";
-        }
-
-        function revertText() {
-            if (replaceTargetIndex < 0 || !originalPairValue) return;
-            let val = editor.value;
-            let targetChar = val.charAt(replaceTargetIndex);
-
-            if (targetChar === 'ş' || targetChar === 'Ş' || targetChar === 'ç' || targetChar === 'Ç') {
-                let currentCaret = editor.selectionStart;
-                editor.value = val.substring(0, replaceTargetIndex) + originalPairValue + val.substring(replaceTargetIndex + 1);
-                let newCaret = (currentCaret > replaceTargetIndex) ? currentCaret + 1 : replaceTargetIndex + 2;
-                editor.focus();
-                editor.selectionStart = editor.selectionEnd = newCaret;
-            }
-            hideTooltip();
-        }
-
-        // Конвертер файлов для сайта
-        let processedBlob = null;
-        let processedOutName = "";
-        let processedMimeType = "application/octet-stream";
-
-        async function processFile(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const fileInfo = document.getElementById('fileInfo');
-            const saveBtn = document.getElementById('saveBtn');
-            saveBtn.style.display = 'none';
-            processedBlob = null;
-
-            const dotIndex = file.name.lastIndexOf('.');
-            processedOutName = (dotIndex !== -1)
-                ? file.name.substring(0, dotIndex) + "_yangi" + file.name.substring(dotIndex)
-                : "yangi_" + file.name;
-
-            const ext = file.name.split('.').pop().toLowerCase();
-            fileInfo.style.color = "#3B82F6";
-            fileInfo.innerText = "Konvertatsiya qilinmoqda: " + file.name + "...";
-
-            try {
-                if (ext === 'txt') {
-                    const text = await file.text();
-                    const converted = applyReplacements(text);
-                    processedMimeType = "text/plain;charset=utf-8";
-                    processedBlob = new Blob([converted], { type: processedMimeType });
-                } else if (ext === 'docx' || ext === 'xlsx' || ext === 'pptx') {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const zip = await JSZip.loadAsync(arrayBuffer);
-                    const tasks = [];
-
-                    zip.forEach((relativePath, zipEntry) => {
-                        if (relativePath.endsWith('.xml') && !relativePath.startsWith('word/embeddings/') && !relativePath.startsWith('ppt/embeddings/')) {
-                            tasks.push(
-                                zipEntry.async("string").then(xmlContent => {
-                                    const updatedXml = xmlContent.replace(/>([^<]+)</g, function(match, textContent) {
-                                        return '>' + applyReplacements(textContent) + '<';
-                                    });
-                                    zip.file(relativePath, updatedXml);
-                                })
-                            );
-                        }
-                    });
-
-                    await Promise.all(tasks);
-
-                    processedMimeType = "application/octet-stream";
-                    if (ext === 'docx') processedMimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-                    if (ext === 'xlsx') processedMimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-                    if (ext === 'pptx') processedMimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-
-                    processedBlob = await zip.generateAsync({
-                        type: "blob",
-                        mimeType: processedMimeType,
-                        compression: "DEFLATE"
-                    });
-                } else {
-                    fileInfo.style.color = "#E11D48";
-                    fileInfo.innerText = "Faqat .docx, .xlsx, .pptx yoki .txt fayllarni tanlang";
-                    return;
-                }
-
-                fileInfo.style.color = "#10B981";
-                fileInfo.innerText = "Tayyor: " + processedOutName;
-                saveBtn.style.display = 'inline-flex';
-            } catch (err) {
-                fileInfo.style.color = "#E11D48";
-                fileInfo.innerText = "Xatolik yuz berdi: " + err.message;
-            }
-
-            e.target.value = "";
-        }
-
-        function downloadFile() {
-            if (!processedBlob) return;
-            const url = URL.createObjectURL(processedBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = processedOutName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(url), 2000);
-        }
-    </script>
-</body>
-</html>
