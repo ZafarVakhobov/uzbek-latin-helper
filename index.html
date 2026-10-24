@@ -127,7 +127,6 @@
             flex-wrap: wrap;
             justify-content: center;
         }
-        /* Фирменная кнопка Telegram / Faylni yuklaş / Saqlaş */
         .pill-btn {
             display: inline-flex;
             align-items: center;
@@ -167,7 +166,6 @@
             font-weight: 500;
             color: #94A3B8;
         }
-        /* Стеклянный тултип Sh / Ch (Liquid Glass) */
         #popup-tip {
             position: fixed;
             display: none;
@@ -194,7 +192,6 @@
 </head>
 <body>
 
-    <!-- Всплывающий тултип возврата Sh / Ch -->
     <div id="popup-tip" onmousedown="event.preventDefault(); revertText();">Sh</div>
 
     <div class="container">
@@ -263,7 +260,6 @@
             });
         }
 
-        // 1. Автоматический текущий год
         document.getElementById('currentYear').innerText = new Date().getFullYear();
 
         const editor = document.getElementById('editor');
@@ -273,7 +269,6 @@
         let originalPairValue = "";
         let tipTimeout = null;
 
-        // Замена только Oʻ и Gʻ (используется внутри кавычек, где Ch и Sh менять нельзя)
         function replaceOnlyOg(str) {
             return str
                 .replace(/G['`\u02BB\u2018\u2019\u02BC]/g, 'Ğ')
@@ -282,7 +277,6 @@
                 .replace(/o['`\u02BB\u2018\u2019\u02BC]/g, 'ö');
         }
 
-        // Умная функция замены: защищает ссылки и текст в кавычках от замены Ch / Sh
         function applyReplacements(text) {
             if (!text) return "";
 
@@ -293,26 +287,22 @@
                 return token;
             }
 
-            // Шаг 1. Защищаем URL-ссылки, домены и email-адреса целиком
             const urlRegex = /(?:https?:\/\/|ftp:\/\/|www\.|t\.me\/)[^\s"'«»“”<>()]+|\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b|\b[a-zA-Z0-9-]+\.(?:uz|com|ru|org|net|io|me|edu|gov|info|biz|tv|co|uk|de|ai|app|dev)(?:\/[^\s"'«»“”<>()]*)?\b/gi;
             let processed = text.replace(urlRegex, function(match) {
                 return savePlaceholder(match);
             });
 
-            // Шаг 2. Защищаем зарубежные названия в кавычках ("...", «...», “...”, „...“) от замены Ch / Sh
             const quoteRegex = /("[^"\n]*"|«[^»\n]*»|“[^”\n]*”|„[^“\n]*“)/g;
             processed = processed.replace(quoteRegex, function(match) {
                 return savePlaceholder(replaceOnlyOg(match));
             });
 
-            // Шаг 3. В основном тексте заменяем Oʻ, Gʻ, Sh, Ch
             processed = replaceOnlyOg(processed)
                 .replace(/S[hH]/g, 'Ş')
                 .replace(/s[hH]/g, 'ş')
                 .replace(/C[hH]/g, 'Ç')
                 .replace(/c[hH]/g, 'ç');
 
-            // Шаг 4. Возвращаем защищенные ссылки и кавычки на место
             processed = processed.replace(/\uE000(\d+)\uE001/g, function(_, index) {
                 return placeholders[Number(index)];
             });
@@ -345,7 +335,6 @@
             return false;
         }
 
-        // 2. Мгновенная автозамена при вставке скопированного текста
         editor.addEventListener('paste', function(e) {
             e.preventDefault();
             let pastedText = (e.clipboardData || window.clipboardData).getData('text');
@@ -360,7 +349,6 @@
             hideTooltip();
         });
 
-        // 3. Автозамена при наборе текста + всплывающий тултип для Sh / Ch
         editor.addEventListener('input', function(e) {
             if (e.inputType === 'insertFromPaste') {
                 let pos = this.selectionStart;
@@ -449,100 +437,11 @@
             hideTooltip();
         }
 
-        // 4. Надёжный конвертер для .docx, .xlsx, .pptx и .txt
+        // Абсолютно безопасный конвертер офисных файлов (работает через точечную замену текста в XML)
         let processedBlob = null;
         let processedOutName = "";
         let processedMimeType = "application/octet-stream";
         let cachedDownloadUrl = "";
-
-        function convertXmlTextSafely(xmlString) {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlString, "application/xml");
-
-            if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
-                return xmlString.replace(/>([^<]+)</g, function(full, innerText) {
-                    return '>' + applyReplacements(innerText) + '<';
-                });
-            }
-
-            const allElements = xmlDoc.getElementsByTagName("*");
-            const containers = [];
-            for (let i = 0; i < allElements.length; i++) {
-                const ln = allElements[i].localName;
-                if (ln === "p" || ln === "si") {
-                    containers.push(allElements[i]);
-                }
-            }
-
-            if (containers.length > 0) {
-                for (let c = 0; c < containers.length; c++) {
-                    const children = containers[c].getElementsByTagName("*");
-                    const tNodes = [];
-                    for (let j = 0; j < children.length; j++) {
-                        if (children[j].localName === "t") {
-                            tNodes.push(children[j]);
-                        }
-                    }
-                    processTextNodeGroup(tNodes);
-                }
-            } else {
-                const tNodes = [];
-                for (let i = 0; i < allElements.length; i++) {
-                    if (allElements[i].localName === "t") {
-                        tNodes.push(allElements[i]);
-                    }
-                }
-                processTextNodeGroup(tNodes);
-            }
-
-            const serializer = new XMLSerializer();
-            return serializer.serializeToString(xmlDoc);
-        }
-
-        function processTextNodeGroup(tNodes) {
-            if (tNodes.length === 0) return;
-
-            let fullBefore = "";
-            for (let i = 0; i < tNodes.length - 1; i++) {
-                let curr = tNodes[i].textContent || "";
-                let next = tNodes[i + 1].textContent || "";
-                fullBefore += curr;
-
-                if (!curr || !next) continue;
-
-                let lastChar = curr.charAt(curr.length - 1);
-                let firstChar = next.charAt(0);
-                let pair = lastChar + firstChar;
-
-                if (!isCursorInUrlOrQuotes(fullBefore)) {
-                    let replacedPair = applyReplacements(pair);
-                    if (replacedPair.length === 1 && replacedPair !== pair) {
-                        tNodes[i].textContent = curr.substring(0, curr.length - 1) + replacedPair;
-                        tNodes[i + 1].textContent = next.substring(1);
-                    }
-                }
-            }
-
-            let runningText = "";
-            for (let i = 0; i < tNodes.length; i++) {
-                let raw = tNodes[i].textContent;
-                if (!raw) continue;
-
-                if (isCursorInUrlOrQuotes(runningText)) {
-                    let closeIdx = raw.search(/["»”]/);
-                    if (closeIdx !== -1) {
-                        let quotedPart = raw.substring(0, closeIdx + 1);
-                        let restPart = raw.substring(closeIdx + 1);
-                        tNodes[i].textContent = replaceOnlyOg(quotedPart) + applyReplacements(restPart);
-                    } else {
-                        tNodes[i].textContent = replaceOnlyOg(raw);
-                    }
-                } else {
-                    tNodes[i].textContent = applyReplacements(raw);
-                }
-                runningText += raw;
-            }
-        }
 
         async function processFile(e) {
             const file = e.target.files[0];
@@ -575,14 +474,19 @@
                     const tasks = [];
 
                     zip.forEach((relativePath, zipEntry) => {
-                        const isWordXml = /^word\/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$/i.test(relativePath);
-                        const isExcelXml = /^xl\/(sharedStrings\.xml|worksheets\/sheet\d+\.xml)$/i.test(relativePath);
-                        const isPptXml = /^ppt\/(slides\/slide\d+|notesSlides\/notesSlide\d+)\.xml$/i.test(relativePath);
+                        // Обрабатываем все XML файлы с текстом внутри документов Office
+                        const isTextXml = /\.(xml|rels)$/i.test(relativePath) && 
+                            !relativePath.startsWith("word/_rels/") && 
+                            !relativePath.startsWith("xl/_rels/") && 
+                            !relativePath.startsWith("ppt/_rels/");
 
-                        if (isWordXml || isExcelXml || isPptXml) {
+                        if (isTextXml) {
                             tasks.push(
                                 zipEntry.async("string").then(xmlContent => {
-                                    const updatedXml = convertXmlTextSafely(xmlContent);
+                                    // Безопасно заменяем текст внутри открывающих и закрывающих тегов XML, не трогая системную разметку
+                                    const updatedXml = xmlContent.replace(/>([^<]+)</g, function(match, textContent) {
+                                        return '>' + applyReplacements(textContent) + '<';
+                                    });
                                     zip.file(relativePath, updatedXml);
                                 })
                             );
@@ -618,11 +522,9 @@
             e.target.value = "";
         }
 
-        // Генерация прямой HTTPS-ссылки для обхода блокировки Telegram WebView
         async function getDirectHttpsUrl(blob, fileName) {
             if (cachedDownloadUrl) return cachedDownloadUrl;
 
-            // Канал 1: tmpfiles.org API (возвращает прямую HTTPS-ссылку)
             try {
                 const fd = new FormData();
                 fd.append("file", blob, fileName);
@@ -639,7 +541,6 @@
                 }
             } catch (e) {}
 
-            // Канал 2 (резервный): file.io API
             try {
                 const fd2 = new FormData();
                 fd2.append("file", blob, fileName);
@@ -659,13 +560,11 @@
             return "";
         }
 
-        // 5. Нативное скачивание в Telegram Mini App (Desktop + Mobile) и браузерах
         async function downloadFile() {
             if (!processedBlob) return;
 
             const isTelegramEnv = Boolean(tg && tg.initData !== undefined && tg.platform && tg.platform !== 'unknown');
 
-            // Если открыто в обычном браузере вне Telegram — скачиваем напрямую
             if (!isTelegramEnv) {
                 const url = URL.createObjectURL(processedBlob);
                 const link = document.createElement('a');
@@ -678,7 +577,6 @@
                 return;
             }
 
-            // Внутри Telegram Mini App получаем прямую HTTPS-ссылку, которую принимает движок Telegram
             const saveBtn = document.getElementById('saveBtn');
             const saveBtnText = document.getElementById('saveBtnText');
             const fileInfo = document.getElementById('fileInfo');
@@ -692,14 +590,12 @@
                 const directUrl = await getDirectHttpsUrl(processedBlob, processedOutName);
 
                 if (directUrl) {
-                    // Если версия Telegram поддерживает нативное окно скачивания downloadFile (Bot API 8.0+)
                     if (tg.downloadFile) {
                         tg.downloadFile({ url: directUrl, file_name: processedOutName }, function(accepted) {
                             fileInfo.style.color = "#10B981";
                             fileInfo.innerText = accepted ? "Fayl muvaffaqiyatli saqlandi!" : "Yuklab oliş tayyor: " + processedOutName;
                         });
                     } else if (tg.openLink) {
-                        // Для более старых версий Telegram открываем системную загрузку через внешний браузер
                         tg.openLink(directUrl);
                         fileInfo.style.color = "#10B981";
                         fileInfo.innerText = "Fayl yuklab olindi!";
@@ -707,7 +603,6 @@
                         window.open(directUrl, "_blank");
                     }
                 } else {
-                    // Если облачные шлюзы недоступны — пробуем системное меню Share на смартфонах
                     const fileObj = new File([processedBlob], processedOutName, { type: processedMimeType });
                     if (navigator.canShare && navigator.canShare({ files: [fileObj] })) {
                         await navigator.share({ files: [fileObj], title: processedOutName });
