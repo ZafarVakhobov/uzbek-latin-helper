@@ -437,11 +437,9 @@
             hideTooltip();
         }
 
-        // Абсолютно безопасный конвертер офисных файлов (работает через точечную замену текста в XML)
         let processedBlob = null;
         let processedOutName = "";
         let processedMimeType = "application/octet-stream";
-        let cachedDownloadUrl = "";
 
         async function processFile(e) {
             const file = e.target.files[0];
@@ -451,7 +449,6 @@
             const saveBtn = document.getElementById('saveBtn');
             saveBtn.style.display = 'none';
             processedBlob = null;
-            cachedDownloadUrl = "";
 
             const dotIndex = file.name.lastIndexOf('.');
             processedOutName = (dotIndex !== -1)
@@ -474,16 +471,11 @@
                     const tasks = [];
 
                     zip.forEach((relativePath, zipEntry) => {
-                        // Обрабатываем все XML файлы с текстом внутри документов Office
-                        const isTextXml = /\.(xml|rels)$/i.test(relativePath) && 
-                            !relativePath.startsWith("word/_rels/") && 
-                            !relativePath.startsWith("xl/_rels/") && 
-                            !relativePath.startsWith("ppt/_rels/");
-
-                        if (isTextXml) {
+                        // Точно обрабатываем все XML файлы документов, исключая бинарные картинки, шрифты и темы
+                        if (relativePath.endsWith('.xml') && !relativePath.startsWith('word/embeddings/') && !relativePath.startsWith('ppt/embeddings/')) {
                             tasks.push(
                                 zipEntry.async("string").then(xmlContent => {
-                                    // Безопасно заменяем текст внутри открывающих и закрывающих тегов XML, не трогая системную разметку
+                                    // Безопасная точечная замена текста внутри тегов XML
                                     const updatedXml = xmlContent.replace(/>([^<]+)</g, function(match, textContent) {
                                         return '>' + applyReplacements(textContent) + '<';
                                     });
@@ -522,102 +514,36 @@
             e.target.value = "";
         }
 
-        async function getDirectHttpsUrl(blob, fileName) {
-            if (cachedDownloadUrl) return cachedDownloadUrl;
-
-            try {
-                const fd = new FormData();
-                fd.append("file", blob, fileName);
-                const res = await fetch("https://tmpfiles.org/api/v1/upload", {
-                    method: "POST",
-                    body: fd
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.data && data.data.url) {
-                        cachedDownloadUrl = data.data.url.replace("http://tmpfiles.org/", "https://tmpfiles.org/dl/").replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
-                        return cachedDownloadUrl;
-                    }
-                }
-            } catch (e) {}
-
-            try {
-                const fd2 = new FormData();
-                fd2.append("file", blob, fileName);
-                const res2 = await fetch("https://file.io/?expires=1d", {
-                    method: "POST",
-                    body: fd2
-                });
-                if (res2.ok) {
-                    const data2 = await res2.json();
-                    if (data2 && data2.link) {
-                        cachedDownloadUrl = data2.link;
-                        return cachedDownloadUrl;
-                    }
-                }
-            } catch (e) {}
-
-            return "";
-        }
-
+        // Прямое скачивание через нативное системное меню Web Share API или Data URL без потери байтов
         async function downloadFile() {
             if (!processedBlob) return;
 
-            const isTelegramEnv = Boolean(tg && tg.initData !== undefined && tg.platform && tg.platform !== 'unknown');
+            const fileObj = new File([processedBlob], processedOutName, { type: processedMimeType });
 
-            if (!isTelegramEnv) {
-                const url = URL.createObjectURL(processedBlob);
+            // Если устройство поддерживает шторку «Поделиться» (мобильные телефоны в Telegram и браузеры)
+            if (navigator.canShare && navigator.canShare({ files: [fileObj] })) {
+                try {
+                    await navigator.share({
+                        files: [fileObj],
+                        title: processedOutName
+                    });
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                }
+            }
+
+            // Для компьютеров и систем без Web Share используем прямой Data URL (гарантированно сохраняет полный вес и содержимое)
+            const reader = new FileReader();
+            reader.onloadend = function() {
                 const link = document.createElement('a');
-                link.href = url;
+                link.href = reader.result;
                 link.download = processedOutName;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                setTimeout(() => URL.revokeObjectURL(url), 2000);
-                return;
-            }
-
-            const saveBtn = document.getElementById('saveBtn');
-            const saveBtnText = document.getElementById('saveBtnText');
-            const fileInfo = document.getElementById('fileInfo');
-
-            saveBtn.disabled = true;
-            saveBtnText.innerText = "Yuklanmoqda...";
-            fileInfo.style.color = "#3B82F6";
-            fileInfo.innerText = "Telegram orqali yuklab oliş tayyorlanmoqda...";
-
-            try {
-                const directUrl = await getDirectHttpsUrl(processedBlob, processedOutName);
-
-                if (directUrl) {
-                    if (tg.downloadFile) {
-                        tg.downloadFile({ url: directUrl, file_name: processedOutName }, function(accepted) {
-                            fileInfo.style.color = "#10B981";
-                            fileInfo.innerText = accepted ? "Fayl muvaffaqiyatli saqlandi!" : "Yuklab oliş tayyor: " + processedOutName;
-                        });
-                    } else if (tg.openLink) {
-                        tg.openLink(directUrl);
-                        fileInfo.style.color = "#10B981";
-                        fileInfo.innerText = "Fayl yuklab olindi!";
-                    } else {
-                        window.open(directUrl, "_blank");
-                    }
-                } else {
-                    const fileObj = new File([processedBlob], processedOutName, { type: processedMimeType });
-                    if (navigator.canShare && navigator.canShare({ files: [fileObj] })) {
-                        await navigator.share({ files: [fileObj], title: processedOutName });
-                    } else {
-                        fileInfo.style.color = "#E11D48";
-                        fileInfo.innerText = "Internet aloqasini tekşiring va qayta urinib köring";
-                    }
-                }
-            } catch (err) {
-                fileInfo.style.color = "#E11D48";
-                fileInfo.innerText = "Xatolik: " + err.message;
-            } finally {
-                saveBtn.disabled = false;
-                saveBtnText.innerText = "Saqlaş";
-            }
+            };
+            reader.readAsDataURL(processedBlob);
         }
     </script>
 </body>
