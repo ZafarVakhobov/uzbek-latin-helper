@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Uzbek Latin Helper</title>
+    <title>Uzbek Latin Helper v.1.0.0</title>
     <!-- Официальный SDK Telegram Mini Apps -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Подключаем шрифт Manrope -->
@@ -203,7 +203,7 @@
                 <div class="section-title">Matnni kiriting (Lotin / Kirill):</div>
                 <div class="copy-link" id="copyBtn" onclick="copyEditorText()">Nusxa oliş</div>
             </div>
-            <textarea id="editor" placeholder="Şahar, Özbekiston, Шаҳар, Ўзбекистон..."></textarea>
+            <textarea id="editor" placeholder="Şahar, Özbekiston, Қўqon, Шаҳар..."></textarea>
         </div>
 
         <!-- Блок конвертера: виден на сайте, но автоматически скрывается в Telegram App -->
@@ -291,7 +291,12 @@
         function cyrillicToLatin(text) {
             if (!text) return "";
 
-            return text.replace(/[А-Яа-яЁёҒғҚқЎўҲҳЪъ]+(?:['`ʼ][А-Яа-яЁёҒғҚқЎўҲҳЪъ]+)*/g, function(word) {
+            // Исключения для слов типа субъект, объект
+            let modifiedText = text
+                .replace(/Субъект/g, "Subyekt").replace(/субъект/g, "subyekt")
+                .replace(/Объект/g, "Obyekt").replace(/объект/g, "obyekt");
+
+            return modifiedText.replace(/[А-Яа-яЁёҒғҚқЎўҲҳЪъ]+(?:['`ʼ][А-Яа-яЁёҒғҚқЎўҲҳЪъ]+)*/g, function(word) {
                 if (isRussianCommonWord(word)) {
                     return word;
                 }
@@ -300,18 +305,24 @@
                 for (let i = 0; i < word.length; i++) {
                     let ch = word[i];
                     let prev = word[i - 1] || "";
+                    let next = word[i + 1] || "";
 
                     if (ch === 'Ю' || ch === 'ю') { res += (ch === 'Ю' ? 'Yu' : 'yu'); continue; }
                     if (ch === 'Я' || ch === 'я') { res += (ch === 'Я' ? 'Ya' : 'ya'); continue; }
                     if (ch === 'Ё' || ch === 'ё') { res += (ch === 'Ё' ? 'Yo' : 'yo'); continue; }
                     
-                    // Правило для Е/е: Ye в начале слова ИЛИ после гласных/апострофов/разделителей, во всех остальных позициях — ye/e
+                    // Правило для Е/е: 
+                    // Ye в начале слова, после гласных, в именах собственных (с заглавной буквы) или после ъ/ь/ʼ.
+                    // После согласных всегда E/e (Президент -> Prezident).
                     if (ch === 'Е' || ch === 'е') {
-                        let isStart = (i === 0 || /^[А-Яа-яЁёҒғҚқЎўҲҳЪъA-Za-z\s.,!?;:()«»""''‘’ʼ_-]$/.test(prev));
-                        let isAfterVowel = /[аеёиоўуэюяа́е́ё́и́о́ў́у́э́ю́я́äëöüăğşç]/.test(prev.toLowerCase());
-                        
-                        let tr = (isStart || isAfterVowel) ? (ch === 'Е' ? 'Ye' : 'ye') : (ch === 'Е' ? 'E' : 'e');
-                        res += tr;
+                        let isStart = (i === 0);
+                        let isAfterVowel = /[аеёиоўуэюяäëöüăğşç]/.test(prev.toLowerCase());
+                        let isAfterConsonant = /[бвгғджзйкқлмнпрстфхҳцчш]/.test(prev.toLowerCase());
+                        let isProperName = (word[0] >= 'А' && word[0] <= 'Я');
+                        let isAfterSep = /['`ʼъь]/.test(prev);
+
+                        let useYe = isStart || isAfterVowel || isAfterSep || (isProperName && !isAfterConsonant);
+                        res += useYe ? (ch === 'Е' ? 'Ye' : 'ye') : (ch === 'Е' ? 'E' : 'e');
                         continue;
                     }
 
