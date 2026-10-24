@@ -104,7 +104,7 @@
         textarea:focus {
             border-color: #2AABEE;
         }
-        /* Блок конвертера (виден на сайте, скрывается внутри Telegram App) */
+        /* Блок конвертера: виден на сайте, но автоматически скрывается в Telegram App */
         .converter-box {
             background: #F8FAFC;
             border: 1px dashed #CBD5E1;
@@ -203,7 +203,7 @@
                 <div class="section-title">Matnni kiriting (Lotin / Kirill):</div>
                 <div class="copy-link" id="copyBtn" onclick="copyEditorText()">Nusxa oliş</div>
             </div>
-            <textarea id="editor" placeholder="Şahar, Özbekiston, Шаҳар, Ўзбекистон..."></textarea>
+            <textarea id="editor" placeholder="Şahar, Özbekiston, Қўqon, Шаҳар..."></textarea>
         </div>
 
         <!-- Блок конвертера: виден на сайте, но автоматически скрывается в Telegram App -->
@@ -240,7 +240,7 @@
             tg.ready();
             tg.expand();
 
-            // Если приложение открыто внутри Telegram — скрываем конвертер файлов
+            // Если открыто внутри Telegram — скрываем конвертер файлов
             const isTelegramEnv = Boolean(tg.initData !== undefined && tg.platform && tg.platform !== 'unknown');
             if (isTelegramEnv) {
                 document.getElementById('converterBox').style.display = 'none';
@@ -283,12 +283,12 @@
         function isRussianCommonWord(word) {
             const lower = word.toLowerCase();
             if (word[0] >= 'А' && word[0] <= 'Я') {
-                return false; // Имена собственные и географические названия обязательно транслитерируем
+                return false; // Имена собственные и гео-названия транслитерируем
             }
             return russianCommonWords.has(lower);
         }
 
-        // Полная транслитерация кириллического текста на новую латиницу с правилами для "Ц"
+        // Полная кириллическая транслитерация по вашим точным правилам
         function cyrillicToLatin(text) {
             if (!text) return "";
 
@@ -303,10 +303,11 @@
                     let next = word[i + 1] || "";
                     let prev = word[i - 1] || "";
 
-                    if ((ch === 'Ю' || ch === 'ю')) { res += (ch === 'Ю' ? 'Yu' : 'yu'); continue; }
-                    if ((ch === 'Я' || ch === 'я')) { res += (ch === 'Я' ? 'Ya' : 'ya'); continue; }
-                    if ((ch === 'Ё' || ch === 'ё')) { res += (ch === 'Ё' ? 'Yo' : 'yo'); continue; }
-                    if ((ch === 'Е' || ch === 'е')) { 
+                    if (ch === 'Ю' || ch === 'ю') { res += (ch === 'Ю' ? 'Yu' : 'yu'); continue; }
+                    if (ch === 'Я' || ch === 'я') { res += (ch === 'Я' ? 'Ya' : 'ya'); continue; }
+                    if (ch === 'Ё' || ch === 'ё') { res += (ch === 'Ё' ? 'Yo' : 'yo'); continue; }
+                    if (ch === 'Е' || ch === 'е') { 
+                        // Е/е -> Ye в начале слова, e в остальных позициях
                         let isStart = (i === 0 || /^[А-Яа-яЁёҒғҚқЎўҲҳЪъ 	\n\r.,!?;:()«»""'']$/.test(prev));
                         res += isStart ? (ch === 'Е' ? 'Ye' : 'ye') : (ch === 'Е' ? 'E' : 'e'); 
                         continue; 
@@ -315,37 +316,37 @@
                     switch (ch) {
                         case 'А': case 'а': res += (ch === 'А' ? 'A' : 'a'); break;
                         case 'Б': case 'б': res += (ch === 'Б' ? 'B' : 'b'); break;
-                        case 'Д': case 'д': res += (ch === 'Д' ? 'D' : 'd'); break;
-                        case 'Э': case 'э': res += (ch === 'Э' ? 'E' : 'e'); break;
-                        case 'Ф': case 'ф': res += (ch === 'Ф' ? 'F' : 'f'); break;
+                        case 'В': case 'в': res += (ch === 'В' ? 'V' : 'v'); break;
                         case 'Г': case 'г': res += (ch === 'Г' ? 'G' : 'g'); break;
                         case 'Ғ': case 'ғ': res += (ch === 'Ғ' ? 'Ğ' : 'ğ'); break;
-                        case 'Ҳ': case 'ҳ': res += (ch === 'Ҳ' ? 'H' : 'h'); break;
-                        case 'И': case 'и': res += (ch === 'И' ? 'I' : 'i'); break;
+                        case 'Д': case 'д': res += (ch === 'Д' ? 'D' : 'd'); break;
                         case 'Ж': case 'ж': res += (ch === 'Ж' ? 'J' : 'j'); break;
+                        case 'З': case 'з': res += (ch === 'З' ? 'Z' : 'z'); break;
+                        case 'И': case 'и': res += (ch === 'И' ? 'I' : 'i'); break;
+                        case 'Й': case 'й': res += (ch === 'Й' ? 'Y' : 'y'); break;
                         case 'К': case 'к': res += (ch === 'К' ? 'K' : 'k'); break;
+                        case 'Қ': case 'қ': res += (ch === 'Қ' ? 'Q' : 'q'); break;
                         case 'Л': case 'л': res += (ch === 'Л' ? 'L' : 'l'); break;
                         case 'М': case 'м': res += (ch === 'М' ? 'M' : 'm'); break;
                         case 'Н': case 'н': res += (ch === 'Н' ? 'N' : 'n'); break;
                         case 'О': case 'о': res += (ch === 'О' ? 'O' : 'o'); break;
                         case 'П': case 'п': res += (ch === 'П' ? 'P' : 'p'); break;
-                        case 'Қ': case 'қ': res += (ch === 'Қ' ? 'Q' : 'q'); break;
                         case 'Р': case 'р': res += (ch === 'Р' ? 'R' : 'r'); break;
                         case 'С': case 'с': res += (ch === 'С' ? 'S' : 's'); break;
                         case 'Т': case 'т': res += (ch === 'Т' ? 'T' : 't'); break;
                         case 'У': case 'у': res += (ch === 'У' ? 'U' : 'u'); break;
                         case 'Ў': case 'ў': res += (ch === 'Ў' ? 'Ö' : 'ö'); break;
-                        case 'В': case 'в': res += (ch === 'В' ? 'V' : 'v'); break;
+                        case 'Ф': case 'ф': res += (ch === 'Ф' ? 'F' : 'f'); break;
                         case 'Х': case 'х': res += (ch === 'Х' ? 'X' : 'x'); break;
-                        case 'Й': case 'й': res += (ch === 'Й' ? 'Y' : 'y'); break;
-                        case 'З': case 'з': res += (ch === 'З' ? 'Z' : 'z'); break;
-                        case 'Ш': case 'ш': res += (ch === 'Ш' ? 'Ş' : 'ş'); break;
-                        case 'Ч': case 'ч': res += (ch === 'Ч' ? 'Ç' : 'ç'); break;
-                        case 'Ъ': case 'ъ': case 'Ь': case 'ь': res += 'ʼ'; break;
+                        case 'Ҳ': case 'ҳ': res += (ch === 'Ҳ' ? 'H' : 'h'); break;
                         case 'Ц': case 'ц':
                             let isWordStart = (i === 0);
                             res += isWordStart ? (ch === 'Ц' ? 'S' : 's') : (ch === 'Ц' ? 'Ts' : 'ts');
                             break;
+                        case 'Ч': case 'ч': res += (ch === 'Ч' ? 'Ç' : 'ç'); break;
+                        case 'Ш': case 'ш': res += (ch === 'Ш' ? 'Ş' : 'ş'); break;
+                        case 'Ъ': case 'ъ': case 'Ь': case 'ь': res += '’'; break;
+                        case 'Э': case 'э': res += (ch === 'Э' ? 'E' : 'e'); break;
                         default:
                             res += ch;
                     }
@@ -524,7 +525,7 @@
             hideTooltip();
         }
 
-        // Конвертер файлов для сайта (в Telegram App этот блок скрыт)
+        // Конвертер файлов для сайта
         let processedBlob = null;
         let processedOutName = "";
         let processedMimeType = "application/octet-stream";
