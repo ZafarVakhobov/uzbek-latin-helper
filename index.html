@@ -3,13 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Uzbek Latin Helper</title>
+    <title>Uzbek Latin Helper v.1.0.0</title>
     <!-- Официальный SDK Telegram Mini Apps -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Подключаем шрифт Manrope -->
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Библиотека JSZip (оставляем для работы конвертера в обычном браузере) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -90,7 +88,7 @@
         }
         textarea {
             width: 100%;
-            height: 150px;
+            height: 170px;
             padding: 12px;
             border: 1px solid #CBD5E1;
             border-radius: 12px;
@@ -103,30 +101,6 @@
         }
         textarea:focus {
             border-color: #2AABEE;
-        }
-        /* Блок конвертера скрывается только внутри Telegram App */
-        .converter-box {
-            background: #F8FAFC;
-            border: 1px dashed #CBD5E1;
-            border-radius: 14px;
-            padding: 16px;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: center;
-        }
-        .file-info {
-            font-size: 12px;
-            color: #64748B;
-            word-break: break-word;
-            line-height: 1.4;
-        }
-        .btn-row {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            justify-content: center;
         }
         .pill-btn {
             display: inline-flex;
@@ -193,43 +167,26 @@
 
     <div class="container">
         <div class="header">
-            <div class="title">Uzbek Latin Helper</div>
+            <div class="title">Uzbek Latin Helper v.1.0.0</div>
             <div class="author">&copy; Zafar Vakhobov Softwares, <span id="currentYear"></span></div>
             <div class="status">Özbek lotin alifbosidagi yangi standartlarga moslaşiş hamda matnlar bilan işlaş jarayonini maksimal darajada tezlaştirişga möljallangan Uzbek Latin Helper - Telegram'dagi ilovasi</div>
         </div>
 
         <div class="editor-wrapper">
             <div class="section-header">
-                <div class="section-title">Matnni kiriting:</div>
+                <div class="section-title">Matnni kiriting (Lotin / Kirill):</div>
                 <div class="copy-link" id="copyBtn" onclick="copyEditorText()">Nusxa oliş</div>
             </div>
-            <textarea id="editor" placeholder="Şahar, Özbekiston, Çoyxona, Ğalaba..."></textarea>
-        </div>
-
-        <!-- Блок конвертера (автоматически скрывается в Telegram App, виден в обычном браузере) -->
-        <div class="converter-box" id="converterBox">
-            <div class="section-title" style="margin:0;">Office formatidagi fayllar konverteri</div>
-            <div class="file-info" id="fileInfo">Yuklab bölaydigan fayllar formati: .docx, .xlsx, .pptx, .txt</div>
-            <input type="file" id="fileInput" style="display: none;" accept=".docx,.xlsx,.pptx,.txt" onchange="processFile(event)">
-            <div class="btn-row">
-                <button class="pill-btn" onclick="document.getElementById('fileInput').click()">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    Faylni yuklaş
-                </button>
-                <button id="saveBtn" class="pill-btn" style="display:none; background-color: #10B981;" onclick="downloadFile()">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Saqlaş
-                </button>
-            </div>
+            <textarea id="editor" placeholder="Şahar, Özbekiston, Қўqon, Шаҳар..."></textarea>
         </div>
 
         <div class="footer">
             <div class="footer-left">Free Software. All rights reserved</div>
-            <a href="https://t.me/lanigiromusic" target="_blank" class="pill-btn" onclick="openTgLink(event)">
+            <a href="https://t.me/ulh_releases" target="_blank" class="pill-btn" onclick="openTgLink(event)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M21.928 2.502a1.15 1.15 0 0 0-1.178-.127L2.126 10.33a1.132 1.132 0 0 0 .08 2.115l4.762 1.563 1.842 5.79a1.13 1.13 0 0 0 1.923.419l2.725-2.853 4.864 3.59a1.136 1.136 0 0 0 1.787-.678l2.24-16.634a1.148 1.148 0 0 0-.421-1.14zm-3.663 3.633-8.798 7.822-.99 3.495-1.352-4.252 11.14-7.065z" fill="#FFFFFF"/>
                 </svg>
-                @lanigiromusic
+                ULH Releases
             </a>
         </div>
     </div>
@@ -239,18 +196,12 @@
         if (tg) {
             tg.ready();
             tg.expand();
-
-            // Если открыто внутри Telegram — скрываем конвертер файлов, так как WebView не дает скачивать локальные файлы
-            const isTelegramEnv = Boolean(tg.initData !== undefined && tg.platform && tg.platform !== 'unknown');
-            if (isTelegramEnv) {
-                document.getElementById('converterBox').style.display = 'none';
-            }
         }
 
         function openTgLink(e) {
             if (tg && tg.openTelegramLink) {
                 e.preventDefault();
-                tg.openTelegramLink("https://t.me/lanigiromusic");
+                tg.openTelegramLink("https://t.me/ulh_releases");
             }
         }
 
@@ -273,6 +224,96 @@
         let originalPairValue = "";
         let tipTimeout = null;
 
+        // Список исконно русских и иностранных слов/окончаний, которые не нужно транслитерировать
+        const russianAndForeignWords = new Set([
+            "и", "в", "не", "на", "я", "быть", "он", "с", "что", "а", "по", "о", "кто", "это", "как",
+            "у", "к", "же", "вы", "за", "бы", "то", "ее", "мне", "ты", "вот", "от", "меня", "еще",
+            "нет", "о о", "из", "ему", "теперь", "когда", "да", "уже", "для", "до", "ли", "может",
+            "уж", "москва", "россия", "санкт-петербург", "автомобиль", "телефон", "компьютер", "программа",
+            "министерство", "университет", "президент", "кабинет", "комиссия", "департамент"
+        ]);
+
+        function isRussianOrForeignWord(word) {
+            const lower = word.toLowerCase();
+            if (russianAndForeignWords.has(lower)) return true;
+            // Проверка на типичные русские окончания/суффиксы
+            if (/(ов|ев|ин|ын|ский|ский|ович|евич|ична|овна|ция|ство|кам|тах|ми|его|ого|ые|ие|ую|юю)$/.test(lower)) {
+                return true;
+            }
+            return false;
+        }
+
+        // Полная транслитерация кириллического текста на новую латиницу с учетом правил для "Ц"
+        function cyrillicToLatin(text) {
+            if (!text) return "";
+
+            // Распознаем слова и обрабатываем отдельно с учетом стоп-листа
+            return text.replace(/[А-Яа-яЁёҒғҚқЎўҲҳЪъ]+(?:['`ʼ][А-Яа-яЁёҒғҚқЎўҲҳЪъ]+)*/g, function(word) {
+                if (isRussianOrForeignWord(word)) {
+                    return word; // Исконно русские / иностранные слова не трогаем
+                }
+
+                let res = "";
+                for (let i = 0; i < word.length; i++) {
+                    let ch = word[i];
+                    let next = word[i + 1] || "";
+                    let prev = word[i - 1] || "";
+
+                    // Двойные гласные / сочетания
+                    if ((ch === 'Ю' || ch === 'ю')) { res += (ch === 'Ю' ? 'Yu' : 'yu'); continue; }
+                    if ((ch === 'Я' || ch === 'я')) { res += (ch === 'Я' ? 'Ya' : 'ya'); continue; }
+                    if ((ch === 'Ё' || ch === 'ё')) { res += (ch === 'Ё' ? 'Yo' : 'yo'); continue; }
+                    if ((ch === 'Е' || ch === 'е')) { 
+                        // Если в начале слова или после гласной/апострофа -> Ye/ye, иначе E/e
+                        let isStart = (i === 0 || /^[А-Яа-яЁёҒғҚқЎўҲҳЪъ 	\n\r.,!?;:()«»""'']$/.test(prev));
+                        res += isStart ? (ch === 'Е' ? 'Ye' : 'ye') : (ch === 'Е' ? 'E' : 'e'); 
+                        continue; 
+                    }
+
+                    switch (ch) {
+                        case 'А': case 'а': res += (ch === 'А' ? 'A' : 'a'); break;
+                        case 'Б': case 'б': res += (ch === 'Б' ? 'B' : 'b'); break;
+                        case 'Д': case 'д': res += (ch === 'Д' ? 'D' : 'd'); break;
+                        case 'Э': case 'э': res += (ch === 'Э' ? 'E' : 'e'); break;
+                        case 'Ф': case 'ф': res += (ch === 'Ф' ? 'F' : 'f'); break;
+                        case 'Г': case 'г': res += (ch === 'Г' ? 'G' : 'g'); break;
+                        case 'Ғ': case 'ғ': res += (ch === 'Ғ' ? 'Ğ' : 'ğ'); break;
+                        case 'Ҳ': case 'ҳ': res += (ch === 'Ҳ' ? 'H' : 'h'); break;
+                        case 'И': case 'и': res += (ch === 'И' ? 'I' : 'i'); break;
+                        case 'Ж': case 'ж': res += (ch === 'Ж' ? 'J' : 'j'); break;
+                        case 'К': case 'к': res += (ch === 'К' ? 'K' : 'k'); break;
+                        case 'Л': case 'л': res += (ch === 'Л' ? 'L' : 'l'); break;
+                        case 'М': case 'м': res += (ch === 'М' ? 'M' : 'm'); break;
+                        case 'Н': case 'н': res += (ch === 'Н' ? 'N' : 'n'); break;
+                        case 'О': case 'о': res += (ch === 'О' ? 'O' : 'o'); break;
+                        case 'П': case 'п': res += (ch === 'П' ? 'P' : 'p'); break;
+                        case 'Қ': case 'қ': res += (ch === 'Қ' ? 'Q' : 'q'); break;
+                        case 'Р': case 'р': res += (ch === 'Р' ? 'R' : 'r'); break;
+                        case 'С': case 'с': res += (ch === 'С' ? 'S' : 's'); break;
+                        case 'Т': case 'т': res += (ch === 'Т' ? 'T' : 't'); break;
+                        case 'У': case 'у': res += (ch === 'У' ? 'U' : 'u'); break;
+                        case 'Ў': case 'ў': res += (ch === 'Ў' ? 'Ö' : 'ö'); break;
+                        case 'В': case 'в': res += (ch === 'В' ? 'V' : 'v'); break;
+                        case 'Х': case 'х': res += (ch === 'Х' ? 'X' : 'x'); break;
+                        case 'Й': case 'й': res += (ch === 'Й' ? 'Y' : 'y'); break;
+                        case 'З': case 'з': res += (ch === 'З' ? 'Z' : 'z'); break;
+                        case 'Ш': case 'ш': res += (ch === 'Ш' ? 'Ş' : 'ş'); break;
+                        case 'Ч': case 'ч': res += (ch === 'Ч' ? 'Ç' : 'ç'); break;
+                        case 'Ъ': case 'ъ': case 'Ь': case 'ь': res += 'ʼ'; break;
+                        case 'Ц': case 'ц':
+                            // Если в начале слова — S/s, в остальных позициях — ts
+                            let isWordStart = (i === 0);
+                            res += isWordStart ? (ch === 'Ц' ? 'S' : 's') : (ch === 'Ц' ? 'Ts' : 'ts');
+                            break;
+                        default:
+                            res += ch;
+                    }
+                }
+                return res;
+            });
+        }
+
+        // Замена только Oʻ и Gʻ
         function replaceOnlyOg(str) {
             return str
                 .replace(/G['`\u02BB\u2018\u2019\u02BC]/g, 'Ğ')
@@ -281,8 +322,12 @@
                 .replace(/o['`\u02BB\u2018\u2019\u02BC]/g, 'ö');
         }
 
+        // Главная функция замены (поддерживает кириллицу, латиницу, защищает ссылки и кавычки)
         function applyReplacements(text) {
             if (!text) return "";
+
+            // Сначала переводим кириллицу в новую латиницу
+            let processed = cyrillicToLatin(text);
 
             const placeholders = [];
             function savePlaceholder(content) {
@@ -291,16 +336,19 @@
                 return token;
             }
 
+            // Защита URL-ссылок и доменов от изменения Ch / Sh
             const urlRegex = /(?:https?:\/\/|ftp:\/\/|www\.|t\.me\/)[^\s"'«»“”<>()]+|\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b|\b[a-zA-Z0-9-]+\.(?:uz|com|ru|org|net|io|me|edu|gov|info|biz|tv|co|uk|de|ai|app|dev)(?:\/[^\s"'«»“”<>()]*)?\b/gi;
-            let processed = text.replace(urlRegex, function(match) {
+            processed = processed.replace(urlRegex, function(match) {
                 return savePlaceholder(match);
             });
 
+            // Защита зарубежных брендов и названий в кавычках («...», "...") от изменения Ch / Sh
             const quoteRegex = /("[^"\n]*"|«[^»\n]*»|“[^”\n]*”|„[^“\n]*“)/g;
             processed = processed.replace(quoteRegex, function(match) {
                 return savePlaceholder(replaceOnlyOg(match));
             });
 
+            // Замена латинских Sh, Ch, O', G'
             processed = replaceOnlyOg(processed)
                 .replace(/S[hH]/g, 'Ş')
                 .replace(/s[hH]/g, 'ş')
@@ -339,6 +387,7 @@
             return false;
         }
 
+        // Автозамена при вставке скопированного текста
         editor.addEventListener('paste', function(e) {
             e.preventDefault();
             let pastedText = (e.clipboardData || window.clipboardData).getData('text');
@@ -353,6 +402,7 @@
             hideTooltip();
         });
 
+        // Автозамена при наборе латиницей (Sh, Ch)
         editor.addEventListener('input', function(e) {
             if (e.inputType === 'insertFromPaste') {
                 let pos = this.selectionStart;
@@ -439,94 +489,6 @@
                 editor.selectionStart = editor.selectionEnd = newCaret;
             }
             hideTooltip();
-        }
-
-        // Логика конвертера файлов (работает на сайте в браузере)
-        let processedBlob = null;
-        let processedOutName = "";
-        let processedMimeType = "application/octet-stream";
-
-        async function processFile(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const fileInfo = document.getElementById('fileInfo');
-            const saveBtn = document.getElementById('saveBtn');
-            saveBtn.style.display = 'none';
-            processedBlob = null;
-
-            const dotIndex = file.name.lastIndexOf('.');
-            processedOutName = (dotIndex !== -1)
-                ? file.name.substring(0, dotIndex) + "_yangi" + file.name.substring(dotIndex)
-                : "yangi_" + file.name;
-
-            const ext = file.name.split('.').pop().toLowerCase();
-            fileInfo.style.color = "#3B82F6";
-            fileInfo.innerText = "Konvertatsiya qilinmoqda: " + file.name + "...";
-
-            try {
-                if (ext === 'txt') {
-                    const text = await file.text();
-                    const converted = applyReplacements(text);
-                    processedMimeType = "text/plain;charset=utf-8";
-                    processedBlob = new Blob([converted], { type: processedMimeType });
-                } else if (ext === 'docx' || ext === 'xlsx' || ext === 'pptx') {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const zip = await JSZip.loadAsync(arrayBuffer);
-                    const tasks = [];
-
-                    zip.forEach((relativePath, zipEntry) => {
-                        if (relativePath.endsWith('.xml') && !relativePath.startsWith('word/embeddings/') && !relativePath.startsWith('ppt/embeddings/')) {
-                            tasks.push(
-                                zipEntry.async("string").then(xmlContent => {
-                                    const updatedXml = xmlContent.replace(/>([^<]+)</g, function(match, textContent) {
-                                        return '>' + applyReplacements(textContent) + '<';
-                                    });
-                                    zip.file(relativePath, updatedXml);
-                                })
-                            );
-                        }
-                    });
-
-                    await Promise.all(tasks);
-
-                    processedMimeType = "application/octet-stream";
-                    if (ext === 'docx') processedMimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-                    if (ext === 'xlsx') processedMimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-                    if (ext === 'pptx') processedMimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-
-                    processedBlob = await zip.generateAsync({
-                        type: "blob",
-                        mimeType: processedMimeType,
-                        compression: "DEFLATE"
-                    });
-                } else {
-                    fileInfo.style.color = "#E11D48";
-                    fileInfo.innerText = "Faqat .docx, .xlsx, .pptx yoki .txt fayllarni tanlang";
-                    return;
-                }
-
-                fileInfo.style.color = "#10B981";
-                fileInfo.innerText = "Tayyor: " + processedOutName;
-                saveBtn.style.display = 'inline-flex';
-            } catch (err) {
-                fileInfo.style.color = "#E11D48";
-                fileInfo.innerText = "Xatolik yuz berdi: " + err.message;
-            }
-
-            e.target.value = "";
-        }
-
-        function downloadFile() {
-            if (!processedBlob) return;
-            const url = URL.createObjectURL(processedBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = processedOutName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(url), 2000);
         }
     </script>
 </body>
