@@ -8,6 +8,8 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Подключаем шрифт Manrope -->
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Библиотека JSZip для работы конвертера в браузере -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -88,7 +90,7 @@
         }
         textarea {
             width: 100%;
-            height: 170px;
+            height: 150px;
             padding: 12px;
             border: 1px solid #CBD5E1;
             border-radius: 12px;
@@ -101,6 +103,30 @@
         }
         textarea:focus {
             border-color: #2AABEE;
+        }
+        /* Блок конвертера (виден на сайте, скрывается внутри Telegram App) */
+        .converter-box {
+            background: #F8FAFC;
+            border: 1px dashed #CBD5E1;
+            border-radius: 14px;
+            padding: 16px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+        .file-info {
+            font-size: 12px;
+            color: #64748B;
+            word-break: break-word;
+            line-height: 1.4;
+        }
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
         .pill-btn {
             display: inline-flex;
@@ -180,6 +206,23 @@
             <textarea id="editor" placeholder="Şahar, Özbekiston, Қўqon, Шаҳар..."></textarea>
         </div>
 
+        <!-- Блок конвертера: виден на сайте, но автоматически скрывается в Telegram App -->
+        <div class="converter-box" id="converterBox">
+            <div class="section-title" style="margin:0;">Office formatidagi fayllar konverteri</div>
+            <div class="file-info" id="fileInfo">Yuklab bölaydigan fayllar formati: .docx, .xlsx, .pptx, .txt</div>
+            <input type="file" id="fileInput" style="display: none;" accept=".docx,.xlsx,.pptx,.txt" onchange="processFile(event)">
+            <div class="btn-row">
+                <button class="pill-btn" onclick="document.getElementById('fileInput').click()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Faylni yuklaş
+                </button>
+                <button id="saveBtn" class="pill-btn" style="display:none; background-color: #10B981;" onclick="downloadFile()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Saqlaş
+                </button>
+            </div>
+        </div>
+
         <div class="footer">
             <div class="footer-left">Free Software. All rights reserved</div>
             <a href="https://t.me/ulh_releases" target="_blank" class="pill-btn" onclick="openTgLink(event)">
@@ -196,6 +239,12 @@
         if (tg) {
             tg.ready();
             tg.expand();
+
+            // Если приложение открыто внутри Telegram — скрываем конвертер файлов
+            const isTelegramEnv = Boolean(tg.initData !== undefined && tg.platform && tg.platform !== 'unknown');
+            if (isTelegramEnv) {
+                document.getElementById('converterBox').style.display = 'none';
+            }
         }
 
         function openTgLink(e) {
@@ -224,33 +273,28 @@
         let originalPairValue = "";
         let tipTimeout = null;
 
-        // Список исконно русских и иностранных слов/окончаний, которые не нужно транслитерировать
-        const russianAndForeignWords = new Set([
+        const russianCommonWords = new Set([
             "и", "в", "не", "на", "я", "быть", "он", "с", "что", "а", "по", "о", "кто", "это", "как",
             "у", "к", "же", "вы", "за", "бы", "то", "ее", "мне", "ты", "вот", "от", "меня", "еще",
-            "нет", "о о", "из", "ему", "теперь", "когда", "да", "уже", "для", "до", "ли", "может",
-            "уж", "москва", "россия", "санкт-петербург", "автомобиль", "телефон", "компьютер", "программа",
-            "министерство", "университет", "президент", "кабинет", "комиссия", "департамент"
+            "нет", "из", "ему", "теперь", "когда", "да", "уже", "для", "до", "ли", "может", "книга",
+            "школа", "машина", "человек", "город", "дом", "работа", "земля", "вода", "солнце", "время"
         ]);
 
-        function isRussianOrForeignWord(word) {
+        function isRussianCommonWord(word) {
             const lower = word.toLowerCase();
-            if (russianAndForeignWords.has(lower)) return true;
-            // Проверка на типичные русские окончания/суффиксы
-            if (/(ов|ев|ин|ын|ский|ский|ович|евич|ична|овна|ция|ство|кам|тах|ми|его|ого|ые|ие|ую|юю)$/.test(lower)) {
-                return true;
+            if (word[0] >= 'А' && word[0] <= 'Я') {
+                return false; // Имена собственные и географические названия обязательно транслитерируем
             }
-            return false;
+            return russianCommonWords.has(lower);
         }
 
-        // Полная транслитерация кириллического текста на новую латиницу с учетом правил для "Ц"
+        // Полная транслитерация кириллического текста на новую латиницу с правилами для "Ц"
         function cyrillicToLatin(text) {
             if (!text) return "";
 
-            // Распознаем слова и обрабатываем отдельно с учетом стоп-листа
             return text.replace(/[А-Яа-яЁёҒғҚқЎўҲҳЪъ]+(?:['`ʼ][А-Яа-яЁёҒғҚқЎўҲҳЪъ]+)*/g, function(word) {
-                if (isRussianOrForeignWord(word)) {
-                    return word; // Исконно русские / иностранные слова не трогаем
+                if (isRussianCommonWord(word)) {
+                    return word;
                 }
 
                 let res = "";
@@ -259,12 +303,10 @@
                     let next = word[i + 1] || "";
                     let prev = word[i - 1] || "";
 
-                    // Двойные гласные / сочетания
                     if ((ch === 'Ю' || ch === 'ю')) { res += (ch === 'Ю' ? 'Yu' : 'yu'); continue; }
                     if ((ch === 'Я' || ch === 'я')) { res += (ch === 'Я' ? 'Ya' : 'ya'); continue; }
                     if ((ch === 'Ё' || ch === 'ё')) { res += (ch === 'Ё' ? 'Yo' : 'yo'); continue; }
                     if ((ch === 'Е' || ch === 'е')) { 
-                        // Если в начале слова или после гласной/апострофа -> Ye/ye, иначе E/e
                         let isStart = (i === 0 || /^[А-Яа-яЁёҒғҚқЎўҲҳЪъ 	\n\r.,!?;:()«»""'']$/.test(prev));
                         res += isStart ? (ch === 'Е' ? 'Ye' : 'ye') : (ch === 'Е' ? 'E' : 'e'); 
                         continue; 
@@ -301,7 +343,6 @@
                         case 'Ч': case 'ч': res += (ch === 'Ч' ? 'Ç' : 'ç'); break;
                         case 'Ъ': case 'ъ': case 'Ь': case 'ь': res += 'ʼ'; break;
                         case 'Ц': case 'ц':
-                            // Если в начале слова — S/s, в остальных позициях — ts
                             let isWordStart = (i === 0);
                             res += isWordStart ? (ch === 'Ц' ? 'S' : 's') : (ch === 'Ц' ? 'Ts' : 'ts');
                             break;
@@ -313,7 +354,6 @@
             });
         }
 
-        // Замена только Oʻ и Gʻ
         function replaceOnlyOg(str) {
             return str
                 .replace(/G['`\u02BB\u2018\u2019\u02BC]/g, 'Ğ')
@@ -322,11 +362,9 @@
                 .replace(/o['`\u02BB\u2018\u2019\u02BC]/g, 'ö');
         }
 
-        // Главная функция замены (поддерживает кириллицу, латиницу, защищает ссылки и кавычки)
         function applyReplacements(text) {
             if (!text) return "";
 
-            // Сначала переводим кириллицу в новую латиницу
             let processed = cyrillicToLatin(text);
 
             const placeholders = [];
@@ -336,19 +374,16 @@
                 return token;
             }
 
-            // Защита URL-ссылок и доменов от изменения Ch / Sh
             const urlRegex = /(?:https?:\/\/|ftp:\/\/|www\.|t\.me\/)[^\s"'«»“”<>()]+|\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b|\b[a-zA-Z0-9-]+\.(?:uz|com|ru|org|net|io|me|edu|gov|info|biz|tv|co|uk|de|ai|app|dev)(?:\/[^\s"'«»“”<>()]*)?\b/gi;
             processed = processed.replace(urlRegex, function(match) {
                 return savePlaceholder(match);
             });
 
-            // Защита зарубежных брендов и названий в кавычках («...», "...") от изменения Ch / Sh
             const quoteRegex = /("[^"\n]*"|«[^»\n]*»|“[^”\n]*”|„[^“\n]*“)/g;
             processed = processed.replace(quoteRegex, function(match) {
                 return savePlaceholder(replaceOnlyOg(match));
             });
 
-            // Замена латинских Sh, Ch, O', G'
             processed = replaceOnlyOg(processed)
                 .replace(/S[hH]/g, 'Ş')
                 .replace(/s[hH]/g, 'ş')
@@ -387,7 +422,6 @@
             return false;
         }
 
-        // Автозамена при вставке скопированного текста
         editor.addEventListener('paste', function(e) {
             e.preventDefault();
             let pastedText = (e.clipboardData || window.clipboardData).getData('text');
@@ -402,7 +436,6 @@
             hideTooltip();
         });
 
-        // Автозамена при наборе латиницей (Sh, Ch)
         editor.addEventListener('input', function(e) {
             if (e.inputType === 'insertFromPaste') {
                 let pos = this.selectionStart;
@@ -489,6 +522,94 @@
                 editor.selectionStart = editor.selectionEnd = newCaret;
             }
             hideTooltip();
+        }
+
+        // Конвертер файлов для сайта (в Telegram App этот блок скрыт)
+        let processedBlob = null;
+        let processedOutName = "";
+        let processedMimeType = "application/octet-stream";
+
+        async function processFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const fileInfo = document.getElementById('fileInfo');
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.style.display = 'none';
+            processedBlob = null;
+
+            const dotIndex = file.name.lastIndexOf('.');
+            processedOutName = (dotIndex !== -1)
+                ? file.name.substring(0, dotIndex) + "_yangi" + file.name.substring(dotIndex)
+                : "yangi_" + file.name;
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            fileInfo.style.color = "#3B82F6";
+            fileInfo.innerText = "Konvertatsiya qilinmoqda: " + file.name + "...";
+
+            try {
+                if (ext === 'txt') {
+                    const text = await file.text();
+                    const converted = applyReplacements(text);
+                    processedMimeType = "text/plain;charset=utf-8";
+                    processedBlob = new Blob([converted], { type: processedMimeType });
+                } else if (ext === 'docx' || ext === 'xlsx' || ext === 'pptx') {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const zip = await JSZip.loadAsync(arrayBuffer);
+                    const tasks = [];
+
+                    zip.forEach((relativePath, zipEntry) => {
+                        if (relativePath.endsWith('.xml') && !relativePath.startsWith('word/embeddings/') && !relativePath.startsWith('ppt/embeddings/')) {
+                            tasks.push(
+                                zipEntry.async("string").then(xmlContent => {
+                                    const updatedXml = xmlContent.replace(/>([^<]+)</g, function(match, textContent) {
+                                        return '>' + applyReplacements(textContent) + '<';
+                                    });
+                                    zip.file(relativePath, updatedXml);
+                                })
+                            );
+                        }
+                    });
+
+                    await Promise.all(tasks);
+
+                    processedMimeType = "application/octet-stream";
+                    if (ext === 'docx') processedMimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                    if (ext === 'xlsx') processedMimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                    if (ext === 'pptx') processedMimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+                    processedBlob = await zip.generateAsync({
+                        type: "blob",
+                        mimeType: processedMimeType,
+                        compression: "DEFLATE"
+                    });
+                } else {
+                    fileInfo.style.color = "#E11D48";
+                    fileInfo.innerText = "Faqat .docx, .xlsx, .pptx yoki .txt fayllarni tanlang";
+                    return;
+                }
+
+                fileInfo.style.color = "#10B981";
+                fileInfo.innerText = "Tayyor: " + processedOutName;
+                saveBtn.style.display = 'inline-flex';
+            } catch (err) {
+                fileInfo.style.color = "#E11D48";
+                fileInfo.innerText = "Xatolik yuz berdi: " + err.message;
+            }
+
+            e.target.value = "";
+        }
+
+        function downloadFile() {
+            if (!processedBlob) return;
+            const url = URL.createObjectURL(processedBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = processedOutName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
         }
     </script>
 </body>
