@@ -62,11 +62,27 @@
             border-radius: 12px;
             display: inline-block;
         }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
         .section-title {
             font-size: 14px;
             font-weight: 700;
             color: #334155;
-            margin-bottom: 6px;
+            margin: 0;
+        }
+        .copy-link {
+            font-size: 12px;
+            font-weight: 700;
+            color: #2AABEE;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        .copy-link:hover {
+            opacity: 0.75;
         }
         .editor-wrapper {
             position: relative;
@@ -103,6 +119,7 @@
             font-size: 12px;
             color: #64748B;
             word-break: break-word;
+            line-height: 1.4;
         }
         .btn-row {
             display: flex;
@@ -131,6 +148,10 @@
         }
         .pill-btn:hover {
             opacity: 0.75;
+        }
+        .pill-btn:disabled {
+            opacity: 0.5;
+            cursor: wait;
         }
         .footer {
             display: flex;
@@ -184,7 +205,10 @@
         </div>
 
         <div class="editor-wrapper">
-            <div class="section-title">Matnni kiriting:</div>
+            <div class="section-header">
+                <div class="section-title">Matnni kiriting:</div>
+                <div class="copy-link" id="copyBtn" onclick="copyEditorText()">Nusxa oliş</div>
+            </div>
             <textarea id="editor" placeholder="Şahar, Özbekiston, Çoyxona, Ğalaba..."></textarea>
         </div>
 
@@ -193,13 +217,13 @@
             <div class="file-info" id="fileInfo">Yuklab bölaydigan fayllar formati: .docx, .xlsx, .pptx, .txt</div>
             <input type="file" id="fileInput" style="display: none;" accept=".docx,.xlsx,.pptx,.txt" onchange="processFile(event)">
             <div class="btn-row">
-                <button class="pill-btn" onclick="document.getElementById('fileInput').click()">
+                <button class="pill-btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     Faylni yuklaş
                 </button>
                 <button id="saveBtn" class="pill-btn" style="display:none;" onclick="downloadFile()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Saqlaş
+                    <span id="saveBtnText">Saqlaş</span>
                 </button>
             </div>
         </div>
@@ -216,17 +240,27 @@
     </div>
 
     <script>
-        // Инициализация Telegram Mini App
-        if (window.Telegram && window.Telegram.WebApp) {
-            window.Telegram.WebApp.ready();
-            window.Telegram.WebApp.expand();
+        const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+        if (tg) {
+            tg.ready();
+            tg.expand();
         }
 
         function openTgLink(e) {
-            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) {
+            if (tg && tg.openTelegramLink) {
                 e.preventDefault();
-                window.Telegram.WebApp.openTelegramLink("https://t.me/lanigiromusic");
+                tg.openTelegramLink("https://t.me/lanigiromusic");
             }
+        }
+
+        function copyEditorText() {
+            const editor = document.getElementById('editor');
+            if (!editor.value) return;
+            navigator.clipboard.writeText(editor.value).then(() => {
+                const btn = document.getElementById('copyBtn');
+                btn.innerText = "Nusxalandi ✓";
+                setTimeout(() => { btn.innerText = "Nusxa oliş"; }, 1800);
+            });
         }
 
         // 1. Автоматический текущий год
@@ -286,7 +320,6 @@
             return processed;
         }
 
-        // Проверка при наборе в реальном времени: находится ли курсор внутри ссылки или внутри кавычек
         function isCursorInUrlOrQuotes(textBeforeCursor) {
             const words = textBeforeCursor.split(/\s+/);
             const currentWord = words[words.length - 1] || "";
@@ -312,7 +345,7 @@
             return false;
         }
 
-        // 2. Мгновенная автозамена при вставке скопированного текста (Ctrl+V / Paste)
+        // 2. Мгновенная автозамена при вставке скопированного текста
         editor.addEventListener('paste', function(e) {
             e.preventDefault();
             let pastedText = (e.clipboardData || window.clipboardData).getData('text');
@@ -327,7 +360,7 @@
             hideTooltip();
         });
 
-        // 3. Автозамена при наборе текста + защита ссылок/кавычек + всплывающий тултип для Sh / Ch
+        // 3. Автозамена при наборе текста + всплывающий тултип для Sh / Ch
         editor.addEventListener('input', function(e) {
             if (e.inputType === 'insertFromPaste') {
                 let pos = this.selectionStart;
@@ -418,8 +451,9 @@
 
         // 4. Надёжный конвертер для .docx, .xlsx, .pptx и .txt
         let processedBlob = null;
-        let processedFileName = "";
+        let processedOutName = "";
         let processedMimeType = "application/octet-stream";
+        let cachedDownloadUrl = "";
 
         function convertXmlTextSafely(xmlString) {
             const parser = new DOMParser();
@@ -518,11 +552,16 @@
             const saveBtn = document.getElementById('saveBtn');
             saveBtn.style.display = 'none';
             processedBlob = null;
-            processedFileName = file.name;
+            cachedDownloadUrl = "";
+
+            const dotIndex = file.name.lastIndexOf('.');
+            processedOutName = (dotIndex !== -1)
+                ? file.name.substring(0, dotIndex) + "_yangi" + file.name.substring(dotIndex)
+                : "yangi_" + file.name;
 
             const ext = file.name.split('.').pop().toLowerCase();
             fileInfo.style.color = "#3B82F6";
-            fileInfo.innerText = "Jarayonda: " + file.name + "...";
+            fileInfo.innerText = "Konvertatsiya qilinmoqda: " + file.name + "...";
 
             try {
                 if (ext === 'txt') {
@@ -569,7 +608,7 @@
                 }
 
                 fileInfo.style.color = "#10B981";
-                fileInfo.innerText = "Tayyor: " + file.name;
+                fileInfo.innerText = "Tayyor: " + processedOutName;
                 saveBtn.style.display = 'inline-flex';
             } catch (err) {
                 fileInfo.style.color = "#E11D48";
@@ -579,41 +618,111 @@
             e.target.value = "";
         }
 
-        // 5. Универсальное сохранение файла для Telegram Mini App (Mobile + Desktop + Web)
+        // Генерация прямой HTTPS-ссылки для обхода блокировки Telegram WebView
+        async function getDirectHttpsUrl(blob, fileName) {
+            if (cachedDownloadUrl) return cachedDownloadUrl;
+
+            // Канал 1: tmpfiles.org API (возвращает прямую HTTPS-ссылку)
+            try {
+                const fd = new FormData();
+                fd.append("file", blob, fileName);
+                const res = await fetch("https://tmpfiles.org/api/v1/upload", {
+                    method: "POST",
+                    body: fd
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.data && data.data.url) {
+                        cachedDownloadUrl = data.data.url.replace("http://tmpfiles.org/", "https://tmpfiles.org/dl/").replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
+                        return cachedDownloadUrl;
+                    }
+                }
+            } catch (e) {}
+
+            // Канал 2 (резервный): file.io API
+            try {
+                const fd2 = new FormData();
+                fd2.append("file", blob, fileName);
+                const res2 = await fetch("https://file.io/?expires=1d", {
+                    method: "POST",
+                    body: fd2
+                });
+                if (res2.ok) {
+                    const data2 = await res2.json();
+                    if (data2 && data2.link) {
+                        cachedDownloadUrl = data2.link;
+                        return cachedDownloadUrl;
+                    }
+                }
+            } catch (e) {}
+
+            return "";
+        }
+
+        // 5. Нативное скачивание в Telegram Mini App (Desktop + Mobile) и браузерах
         async function downloadFile() {
             if (!processedBlob) return;
 
-            const dotIndex = processedFileName.lastIndexOf('.');
-            const outName = (dotIndex !== -1)
-                ? processedFileName.substring(0, dotIndex) + "_yangi" + processedFileName.substring(dotIndex)
-                : "yangi_" + processedFileName;
+            const isTelegramEnv = Boolean(tg && tg.initData !== undefined && tg.platform && tg.platform !== 'unknown');
 
-            // Способ 1: На мобильных устройствах (iOS / Android в Telegram) вызываем системное меню сохранения / отправки файла
-            try {
-                const fileObj = new File([processedBlob], outName, { type: processedMimeType });
-                if (navigator.canShare && navigator.canShare({ files: [fileObj] })) {
-                    await navigator.share({
-                        files: [fileObj],
-                        title: outName
-                    });
-                    return;
-                }
-            } catch (shareErr) {
-                // Если пользователь закрыл окно Share, прекращаем выполнение
-                if (shareErr.name === 'AbortError') return;
-            }
-
-            // Способ 2: Для Telegram Desktop / Web / обычных браузеров (Data URL обходит блокировку blob: в WebView)
-            const reader = new FileReader();
-            reader.onloadend = function() {
+            // Если открыто в обычном браузере вне Telegram — скачиваем напрямую
+            if (!isTelegramEnv) {
+                const url = URL.createObjectURL(processedBlob);
                 const link = document.createElement('a');
-                link.href = reader.result;
-                link.download = outName;
+                link.href = url;
+                link.download = processedOutName;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-            };
-            reader.readAsDataURL(processedBlob);
+                setTimeout(() => URL.revokeObjectURL(url), 2000);
+                return;
+            }
+
+            // Внутри Telegram Mini App получаем прямую HTTPS-ссылку, которую принимает движок Telegram
+            const saveBtn = document.getElementById('saveBtn');
+            const saveBtnText = document.getElementById('saveBtnText');
+            const fileInfo = document.getElementById('fileInfo');
+
+            saveBtn.disabled = true;
+            saveBtnText.innerText = "Yuklanmoqda...";
+            fileInfo.style.color = "#3B82F6";
+            fileInfo.innerText = "Telegram orqali yuklab oliş tayyorlanmoqda...";
+
+            try {
+                const directUrl = await getDirectHttpsUrl(processedBlob, processedOutName);
+
+                if (directUrl) {
+                    // Если версия Telegram поддерживает нативное окно скачивания downloadFile (Bot API 8.0+)
+                    if (tg.downloadFile) {
+                        tg.downloadFile({ url: directUrl, file_name: processedOutName }, function(accepted) {
+                            fileInfo.style.color = "#10B981";
+                            fileInfo.innerText = accepted ? "Fayl muvaffaqiyatli saqlandi!" : "Yuklab oliş tayyor: " + processedOutName;
+                        });
+                    } else if (tg.openLink) {
+                        // Для более старых версий Telegram открываем системную загрузку через внешний браузер
+                        tg.openLink(directUrl);
+                        fileInfo.style.color = "#10B981";
+                        fileInfo.innerText = "Fayl yuklab olindi!";
+                    } else {
+                        window.open(directUrl, "_blank");
+                    }
+                } else {
+                    // Если облачные шлюзы недоступны — пробуем системное меню Share на смартфонах
+                    const fileObj = new File([processedBlob], processedOutName, { type: processedMimeType });
+                    if (navigator.canShare && navigator.canShare({ files: [fileObj] })) {
+                        await navigator.share({ files: [fileObj], title: processedOutName });
+                    } else {
+                        fileInfo.style.color = "#E11D48";
+                        fileInfo.innerText = "Internet aloqasini tekşiring va qayta urinib köring";
+                    }
+                }
+            } catch (err) {
+                fileInfo.style.color = "#E11D48";
+                fileInfo.innerText = "Xatolik: " + err.message;
+            } finally {
+                saveBtn.disabled = false;
+                saveBtnText.innerText = "Saqlaş";
+            }
         }
     </script>
 </body>
