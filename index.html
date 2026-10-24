@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Uzbek Latin Helper</title>
+    <!-- Официальный SDK Telegram Mini Apps -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Подключаем шрифт Manrope -->
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Библиотека для работы с DOCX, XLSX, PPTX прямо в браузере -->
@@ -204,7 +206,7 @@
 
         <div class="footer">
             <div class="footer-left">Free Software. All rights reserved</div>
-            <a href="https://t.me/lanigiromusic" target="_blank" class="pill-btn">
+            <a href="https://t.me/lanigiromusic" target="_blank" class="pill-btn" onclick="openTgLink(event)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M21.928 2.502a1.15 1.15 0 0 0-1.178-.127L2.126 10.33a1.132 1.132 0 0 0 .08 2.115l4.762 1.563 1.842 5.79a1.13 1.13 0 0 0 1.923.419l2.725-2.853 4.864 3.59a1.136 1.136 0 0 0 1.787-.678l2.24-16.634a1.148 1.148 0 0 0-.421-1.14zm-3.663 3.633-8.798 7.822-.99 3.495-1.352-4.252 11.14-7.065z" fill="#FFFFFF"/>
                 </svg>
@@ -214,7 +216,20 @@
     </div>
 
     <script>
-        // 1. Автоматический текущий год (2026, 2027, 2028 и т.д.)
+        // Инициализация Telegram Mini App
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+        }
+
+        function openTgLink(e) {
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) {
+                e.preventDefault();
+                window.Telegram.WebApp.openTelegramLink("https://t.me/lanigiromusic");
+            }
+        }
+
+        // 1. Автоматический текущий год
         document.getElementById('currentYear').innerText = new Date().getFullYear();
 
         const editor = document.getElementById('editor');
@@ -273,7 +288,6 @@
 
         // Проверка при наборе в реальном времени: находится ли курсор внутри ссылки или внутри кавычек
         function isCursorInUrlOrQuotes(textBeforeCursor) {
-            // 1. Проверяем текущее набираемое слово на ссылку / домен
             const words = textBeforeCursor.split(/\s+/);
             const currentWord = words[words.length - 1] || "";
             if (/^(https?:\/\/|ftp:\/\/|www\.|t\.me\/)/i.test(currentWord) ||
@@ -283,7 +297,6 @@
                 return true;
             }
 
-            // 2. Проверяем, не открыта ли перед курсором кавычка ("...", «...», “...”)
             const lastLine = textBeforeCursor.split('\n').pop();
             const straightQuotes = (lastLine.match(/"/g) || []).length;
             if (straightQuotes % 2 === 1) return true;
@@ -341,11 +354,11 @@
             let inProtectedContext = isCursorInUrlOrQuotes(textBefore);
 
             if ((c1 === 's' || c1 === 'S') && (c2 === 'h' || c2 === 'H')) {
-                if (inProtectedContext) return; // Не меняем Sh в ссылках и кавычках
+                if (inProtectedContext) return;
                 rep = (c1 === 'S') ? 'Ş' : 'ş';
                 isShCh = true;
             } else if ((c1 === 'c' || c1 === 'C') && (c2 === 'h' || c2 === 'H')) {
-                if (inProtectedContext) return; // Не меняем Ch в ссылках и кавычках
+                if (inProtectedContext) return;
                 rep = (c1 === 'C') ? 'Ç' : 'ç';
                 isShCh = true;
             } else if ((c1 === 'g' || c1 === 'G') && isApos) {
@@ -403,9 +416,10 @@
             hideTooltip();
         }
 
-        // 4. Надёжный конвертер для .docx, .xlsx, .pptx и .txt (сохраняет структуру, ссылки и названия в кавычках)
+        // 4. Надёжный конвертер для .docx, .xlsx, .pptx и .txt
         let processedBlob = null;
         let processedFileName = "";
+        let processedMimeType = "application/octet-stream";
 
         function convertXmlTextSafely(xmlString) {
             const parser = new DOMParser();
@@ -417,8 +431,6 @@
                 });
             }
 
-            // Обрабатываем текст на уровне абзацев (<w:p>, <a:p>, <si>), чтобы видеть кавычки и ссылки целиком,
-            // даже если Word разбил их на несколько соседних тегов <w:t>
             const allElements = xmlDoc.getElementsByTagName("*");
             const containers = [];
             for (let i = 0; i < allElements.length; i++) {
@@ -453,11 +465,9 @@
             return serializer.serializeToString(xmlDoc);
         }
 
-        // Обработка группы текстовых узлов внутри одного абзаца с сохранением форматирования каждого узла
         function processTextNodeGroup(tNodes) {
             if (tNodes.length === 0) return;
 
-            // Склеиваем пограничные пары на стыке двух соседних тегов <w:t> (если это не ссылка и не кавычки)
             let fullBefore = "";
             for (let i = 0; i < tNodes.length - 1; i++) {
                 let curr = tNodes[i].textContent || "";
@@ -479,15 +489,12 @@
                 }
             }
 
-            // Отслеживаем контекст кавычек/ссылок по ходу абзаца
             let runningText = "";
             for (let i = 0; i < tNodes.length; i++) {
                 let raw = tNodes[i].textContent;
                 if (!raw) continue;
 
-                // Если предыдущие узлы открыли кавычку и еще не закрыли её
                 if (isCursorInUrlOrQuotes(runningText)) {
-                    // Проверяем, закрывается ли кавычка внутри текущего узла
                     let closeIdx = raw.search(/["»”]/);
                     if (closeIdx !== -1) {
                         let quotedPart = raw.substring(0, closeIdx + 1);
@@ -521,7 +528,8 @@
                 if (ext === 'txt') {
                     const text = await file.text();
                     const converted = applyReplacements(text);
-                    processedBlob = new Blob([converted], { type: "text/plain;charset=utf-8" });
+                    processedMimeType = "text/plain;charset=utf-8";
+                    processedBlob = new Blob([converted], { type: processedMimeType });
                 } else if (ext === 'docx' || ext === 'xlsx' || ext === 'pptx') {
                     const arrayBuffer = await file.arrayBuffer();
                     const zip = await JSZip.loadAsync(arrayBuffer);
@@ -544,14 +552,14 @@
 
                     await Promise.all(tasks);
 
-                    let mimeType = "application/octet-stream";
-                    if (ext === 'docx') mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-                    if (ext === 'xlsx') mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-                    if (ext === 'pptx') mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+                    processedMimeType = "application/octet-stream";
+                    if (ext === 'docx') processedMimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                    if (ext === 'xlsx') processedMimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                    if (ext === 'pptx') processedMimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
                     processedBlob = await zip.generateAsync({
                         type: "blob",
-                        mimeType: mimeType,
+                        mimeType: processedMimeType,
                         compression: "DEFLATE"
                     });
                 } else {
@@ -571,22 +579,41 @@
             e.target.value = "";
         }
 
-        function downloadFile() {
+        // 5. Универсальное сохранение файла для Telegram Mini App (Mobile + Desktop + Web)
+        async function downloadFile() {
             if (!processedBlob) return;
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(processedBlob);
-            link.href = url;
 
             const dotIndex = processedFileName.lastIndexOf('.');
             const outName = (dotIndex !== -1)
                 ? processedFileName.substring(0, dotIndex) + "_yangi" + processedFileName.substring(dotIndex)
                 : "yangi_" + processedFileName;
 
-            link.download = outName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(url), 1500);
+            // Способ 1: На мобильных устройствах (iOS / Android в Telegram) вызываем системное меню сохранения / отправки файла
+            try {
+                const fileObj = new File([processedBlob], outName, { type: processedMimeType });
+                if (navigator.canShare && navigator.canShare({ files: [fileObj] })) {
+                    await navigator.share({
+                        files: [fileObj],
+                        title: outName
+                    });
+                    return;
+                }
+            } catch (shareErr) {
+                // Если пользователь закрыл окно Share, прекращаем выполнение
+                if (shareErr.name === 'AbortError') return;
+            }
+
+            // Способ 2: Для Telegram Desktop / Web / обычных браузеров (Data URL обходит блокировку blob: в WebView)
+            const reader = new FileReader();
+            reader.onloadend = function() {
+                const link = document.createElement('a');
+                link.href = reader.result;
+                link.download = outName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+            reader.readAsDataURL(processedBlob);
         }
     </script>
 </body>
